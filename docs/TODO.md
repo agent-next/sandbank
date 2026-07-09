@@ -4,6 +4,20 @@
 
 ## P1 — 扩展能力覆盖
 
+### Sandbank App Kernel
+
+- [x] App Manifest / Capability Contract 基础 SDK
+- [x] Web / Codex / Cloud Code / MCP / CLI host projection 元数据
+- [x] Tool Use 投影与 scoped capability 授权入口
+- [x] DB9/Postgres 兼容后端能力矩阵
+- [x] 只读 SQL 网关与审计日志基础
+- [x] branch-first 写入 proposal / approval 原语
+- [x] `sandbank app scaffold` 新 AI App 脚手架
+- [ ] 生产级外部账号 OAuth / token minting provider 接入
+- [ ] Web console 可视化 approval queue 与 diff review
+- [ ] MCP server 自动导出 capability manifest
+- [ ] DB9 / Postgres conformance suite 跑真实后端
+
 ### exec.stream
 
 - [ ] Daytona — 检查 `@daytonaio/sdk` 是否支持流式执行

@@ -1,6 +1,7 @@
 import type { CliFlags } from '../auth.js'
 import type { CloudBox } from '@sandbank.dev/cloud'
 import { createApiClient, printJson } from '../api.js'
+import { appCommand } from './app.js'
 
 function takeOption(args: string[], name: string): string | undefined {
   const idx = args.indexOf(name)
@@ -11,6 +12,11 @@ function takeOption(args: string[], name: string): string | undefined {
 }
 
 export async function createCommand(args: string[], flags: CliFlags): Promise<void> {
+  if (args[0] === 'app') {
+    args.shift()
+    return appCommand(['scaffold', ...args], flags)
+  }
+
   const image = takeOption(args, '--image') || 'codebox'
   const cpu = Number(takeOption(args, '--cpu') || 2)
   const memory = Number(takeOption(args, '--memory') || 1024)

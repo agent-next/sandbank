@@ -30,6 +30,7 @@ import { execCommand } from './exec.js'
 import { cloneCommand } from './clone.js'
 import { keepCommand } from './keep.js'
 import { addonsCommand } from './addons.js'
+import { appCommand } from './app.js'
 import { snapshotCommand } from './snapshot.js'
 import { loginCommand } from './login.js'
 import { configCommand } from './config.js'
@@ -175,6 +176,21 @@ describe('createCommand', () => {
     mockX402Fetch.mockResolvedValue({ id: 'abc', status: 'running' })
     await createCommand([], { json: true })
     expect(stdout.join('\n')).toContain('"id"')
+  })
+
+  it('scaffolds an app through create app alias', async () => {
+    await createCommand(['app', 'alias-ai', '--json'], {})
+    expect(mockX402Fetch).not.toHaveBeenCalled()
+    expect(stdout.join('\n')).toContain('"id": "alias-ai"')
+  })
+})
+
+describe('appCommand', () => {
+  it('prints an app scaffold as JSON', async () => {
+    await appCommand(['scaffold', 'demo-ai', '--json'], {})
+    const output = stdout.join('\n')
+    expect(output).toContain('"id": "demo-ai"')
+    expect(output).toContain('src/sandbank.app.ts')
   })
 })
 

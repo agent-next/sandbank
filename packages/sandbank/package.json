@@ -56,6 +56,18 @@
       "types": "./dist/agent-supervisor.d.ts",
       "import": "./dist/agent-supervisor.js"
     },
+    "./app-kernel": {
+      "types": "./dist/app-kernel.d.ts",
+      "import": "./dist/app-kernel.js"
+    },
+    "./workspace-gateway": {
+      "types": "./dist/db9-workspace-gateway.d.ts",
+      "import": "./dist/db9-workspace-gateway.js"
+    },
+    "./db9-workspace-gateway": {
+      "types": "./dist/db9-workspace-gateway.d.ts",
+      "import": "./dist/db9-workspace-gateway.js"
+    },
     "./tool-use": {
       "types": "./dist/tool-use.d.ts",
       "import": "./dist/tool-use.js"

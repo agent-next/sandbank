@@ -30,6 +30,21 @@ export { createDb9Service, createDb9Brain } from './convenience.js'
 // Observer
 export { EVENTS_SCHEMA, createDb9Observer } from './db9-observer.js'
 
+// Backend capability matrix
+export {
+  DB9_BACKEND_CAPABILITY_MATRIX,
+  DB9_DEFAULT_BACKEND_CAPABILITIES,
+  assertDb9BackendCapabilities,
+  missingDb9BackendCapabilities,
+  workspaceCapabilitiesToDb9BackendCapabilities,
+} from './backend-capabilities.js'
+export type {
+  Db9BackendCapability,
+  Db9BackendCapabilityMap,
+  Db9BackendCapabilityName,
+  Db9BackendCapabilityStatus,
+} from './backend-capabilities.js'
+
 // Types
 export type {
   Db9ApiError,

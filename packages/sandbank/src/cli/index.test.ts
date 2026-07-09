@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   cloneCommand: vi.fn(),
   keepCommand: vi.fn(),
   addonsCommand: vi.fn(),
+  appCommand: vi.fn(),
   snapshotCommand: vi.fn(),
   workspaceCommand: vi.fn(),
   harnessApiCommand: vi.fn(),
@@ -29,6 +30,7 @@ vi.mock('./commands/exec.js', () => ({ execCommand: mocks.execCommand }))
 vi.mock('./commands/clone.js', () => ({ cloneCommand: mocks.cloneCommand }))
 vi.mock('./commands/keep.js', () => ({ keepCommand: mocks.keepCommand }))
 vi.mock('./commands/addons.js', () => ({ addonsCommand: mocks.addonsCommand }))
+vi.mock('./commands/app.js', () => ({ appCommand: mocks.appCommand }))
 vi.mock('./commands/snapshot.js', () => ({ snapshotCommand: mocks.snapshotCommand }))
 vi.mock('./commands/workspace.js', () => ({ workspaceCommand: mocks.workspaceCommand }))
 vi.mock('./commands/harness-api.js', () => ({ harnessApiCommand: mocks.harnessApiCommand }))
@@ -128,6 +130,7 @@ describe('dispatch', () => {
     ['clone', 'cloneCommand', ['clone', 'abc']],
     ['keep', 'keepCommand', ['keep', 'abc']],
     ['addons', 'addonsCommand', ['addons', 'list']],
+    ['app', 'appCommand', ['app', 'scaffold', 'demo-app']],
     ['snapshot', 'snapshotCommand', ['snapshot', 'list', 'abc']],
     ['workspace', 'workspaceCommand', ['workspace', 'inspect']],
     ['harness-api', 'harnessApiCommand', ['harness-api']],

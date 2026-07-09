@@ -835,6 +835,24 @@ db9.ai 可以成为这个 App Kernel 的默认 agent-native DB backend，而且�
 
 因此，短期推荐先做 App Manifest、Capability SDK 和 DB9 readonly gateway；中期实现 host projection、外部 host 授权、branch-first write、approval 和 UI view model；长期再把业务 API、数据库、UI、Skill、MCP、CLI、SDK、approval 和 evals 全部收敛到同一份 capability contract。
 
+## 10. 当前落地状态（2026-07-09）
+
+本报告的实施路线已先落成基础框架层，作为后续真实 DB9/Postgres 后端和 Web UI 接入的稳定 ABI：
+
+- `packages/sandbank/src/app-kernel.ts`：提供 App Manifest、Object、Capability、Approval、Audit、View Model、GraphQL-inspired Capability SDL、Host Projection、Tool Use projection、scoped grant token、app scaffold。
+- `packages/sandbank/src/db9-workspace-gateway.ts`：提供 DB9/Postgres 兼容 workspace gateway，包括只读 SQL 归一化/拦截、query audit、memory/artifact 受限写入、branch-first proposal、approval 后 apply。
+- `packages/db9/src/backend-capabilities.ts`：提供 DB9/Postgres backend capability matrix、WorkspaceCapabilities 到 backend conformance 的映射、缺失能力断言。
+- CLI 已支持 `sandbank app scaffold <id>` 和报告中要求的 `sandbank create app <id>` alias，用同一套 scaffold 输出 manifest/capability 模板。
+- `docs/TODO.md` 已把 App Kernel 路线拆成已完成基础项和后续生产化项。
+
+已补充的验证：
+
+- `packages/sandbank/src/app-kernel.test.ts`：验证 capability 授权、approval、SDL/projection、Tool Use 共用入口、scoped grant、scaffold。
+- `packages/sandbank/src/db9-workspace-gateway.test.ts`：验证只读 SQL 防写入、audit、proposal/apply approval。
+- `packages/db9/test/backend-capabilities.test.ts`：验证 DB9/Postgres 能力矩阵和 conformance 映射。
+
+仍需后续生产化的部分不是 ABI 缺口，而是接真实 host/backend 的集成工作：OAuth/token minting provider、Web approval queue/diff UI、MCP server 自动导出、真实 DB9/Postgres conformance suite。
+
 ## 参考资料
 
 - DB9: https://db9.ai/

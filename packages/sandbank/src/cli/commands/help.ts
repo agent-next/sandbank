@@ -7,6 +7,7 @@ Commands:
   login                             Save API key or wallet key
   config                            Show or set configuration
   create [--image <img>]            Create a new sandbox
+  create app <id> [--out <dir>]     Scaffold a Sandbank App Kernel app
   list                              List your sandboxes
   get <id>                          Get sandbox details
   destroy <id>                      Destroy a sandbox
@@ -15,6 +16,7 @@ Commands:
   keep <id> [--minutes <n>]         Extend sandbox timeout
   addons create <type> [--intent]   Create an addon
   addons list                       List addons
+  app scaffold <id> [--out <dir>]   Scaffold a Sandbank App Kernel app
   snapshot create <id> <name>       Create a snapshot
   snapshot list <id>                List snapshots
   snapshot restore <id> <name>      Restore a snapshot
