@@ -13,6 +13,8 @@
 - [x] 只读 SQL 网关与审计日志基础
 - [x] branch-first 写入 proposal / approval 原语
 - [x] `sandbank app scaffold` 新 AI App 脚手架
+- [x] `skills/create-sandbank-ai-app` 新 AI App 创建 skill
+- [x] `examples/notes-ai-app` dogfood example 与本地 DB9-compatible 验证
 - [ ] 生产级外部账号 OAuth / token minting provider 接入
 - [ ] Web console 可视化 approval queue 与 diff review
 - [ ] MCP server 自动导出 capability manifest

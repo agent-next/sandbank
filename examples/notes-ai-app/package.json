@@ -1,0 +1,20 @@
+{
+  "name": "@sandbank.example/notes-ai-app",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:deps": "pnpm --filter @sandbank.dev/workspace build && pnpm --filter @sandbank.dev/db9 build && pnpm --filter sandbank build",
+    "typecheck": "pnpm run build:deps && tsc --noEmit",
+    "verify": "pnpm run build:deps && tsx src/run.ts"
+  },
+  "dependencies": {
+    "@sandbank.dev/db9": "workspace:*",
+    "@sandbank.dev/workspace": "workspace:*",
+    "sandbank": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.7.3"
+  }
+}

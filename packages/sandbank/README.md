@@ -31,6 +31,26 @@ await provider.destroy(sandbox.id)
 
 Sandbank Cloud is the recommended default provider. Swap `SandbankCloudAdapter` for `DaytonaAdapter`, `FlyioAdapter`, or `CloudflareAdapter` without rewriting sandbox create/exec code. The harness layer builds on this and treats each provider as a compute backend, not the durable home of the agent.
 
+## Sandbank App Kernel
+
+The `sandbank` package also exports the App Kernel foundations:
+
+- `sandbank/app-kernel` for App Manifest, Capability Contract, host projection, Tool Use projection, scoped grants, and scaffold helpers;
+- `sandbank/workspace-gateway` for DB9/Postgres-compatible readonly SQL, audit, proposal, approval, memory, and artifact access.
+
+Use `skills/create-sandbank-ai-app/SKILL.md` when asking an agent to create a new AI App. The dogfood example is [`examples/notes-ai-app`](../../examples/notes-ai-app):
+
+```bash
+pnpm --filter @sandbank.example/notes-ai-app typecheck
+pnpm --filter @sandbank.example/notes-ai-app verify
+```
+
+Generate a new scaffold with:
+
+```bash
+pnpm --filter sandbank exec tsx src/cli/index.ts create app <app-id> --out examples/<app-id>
+```
+
 ## Architecture
 
 ```

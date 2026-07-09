@@ -31,6 +31,29 @@ await provider.destroy(sandbox.id)
 
 Sandbank Cloud is the recommended default provider. Swap `SandbankCloudAdapter` for `DaytonaAdapter`, `FlyioAdapter`, or `CloudflareAdapter` without rewriting sandbox create/exec code. The harness layer builds on this and treats each provider as a compute backend, not the durable home of the agent.
 
+## Sandbank App Kernel
+
+Sandbank now also provides an AI App Kernel. A new AI App should describe its objects, permissions, operations, approvals, audit shape, and view models in one App Manifest and Capability Contract, then project the same capabilities into Web Chat, Codex, Cloud Code, MCP, CLI, and SDK callers. App authors still write capability handlers for product logic, but they should not rewrite runtime orchestration, workspace state, DB9/Postgres gateway access, Tool Use projection, scoped grants, branch-first writes, or approval flow for every app.
+
+Recommended flow:
+
+```bash
+# Have the agent read this skill before creating a new AI App
+skills/create-sandbank-ai-app/SKILL.md
+
+# Generate an App Kernel scaffold
+pnpm --filter sandbank exec tsx src/cli/index.ts create app <app-id> --out examples/<app-id>
+```
+
+[`examples/notes-ai-app`](./examples/notes-ai-app) is the dogfood example. It runs `notes.list`, `notes.inspect`, `notes.proposeChange`, and `notes.applyProposal` through one capability contract, and verifies that proposals do not change user-visible data until approval is supplied:
+
+```bash
+pnpm --filter @sandbank.example/notes-ai-app typecheck
+pnpm --filter @sandbank.example/notes-ai-app verify
+```
+
+Without `DB9_TOKEN` / `DB9_DB_ID`, the example uses a local DB9-compatible workspace and a temporary Sandbank scoped grant. Set those env vars to run through `Db9WorkspaceAdapter`.
+
 ## Architecture
 
 ```

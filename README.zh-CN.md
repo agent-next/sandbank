@@ -31,6 +31,29 @@ await provider.destroy(sandbox.id)
 
 Sandbank Cloud 是默认推荐 provider；把 `SandbankCloudAdapter` 换成 `DaytonaAdapter`、`FlyioAdapter` 或 `CloudflareAdapter`，沙箱创建/执行代码仍无需重写。更高一层的 harness 会把这些 provider 当作计算后端，而不是 Agent 的长期家。
 
+## Sandbank App Kernel
+
+Sandbank 现在也提供 AI App Kernel：开发新的 AI App 时，用一份 App Manifest 和 Capability Contract 描述对象、权限、操作、approval、audit 和 view model，再把同一份 capability 投影到 Web Chat、Codex、Cloud Code、MCP、CLI 和 SDK。业务逻辑仍然写在 capability handler 里，但底层 runtime、workspace、DB9/Postgres backend、Tool Use、scoped grant、branch-first writes 和 approval flow 不需要每个 app 重写一遍。
+
+推荐流程：
+
+```bash
+# 让 agent 先读取这个 skill，再创建新 AI App
+skills/create-sandbank-ai-app/SKILL.md
+
+# 使用 CLI 生成 App Kernel scaffold
+pnpm --filter sandbank exec tsx src/cli/index.ts create app <app-id> --out examples/<app-id>
+```
+
+仓库内的 [`examples/notes-ai-app`](./examples/notes-ai-app) 是 dogfood example。它通过同一份 capability contract 跑通 `notes.list`、`notes.inspect`、`notes.proposeChange` 和 `notes.applyProposal`，并验证 proposal 在 approval 前不会写入用户可见数据：
+
+```bash
+pnpm --filter @sandbank.example/notes-ai-app typecheck
+pnpm --filter @sandbank.example/notes-ai-app verify
+```
+
+没有 `DB9_TOKEN` / `DB9_DB_ID` 时，example 使用 local DB9-compatible workspace 和临时 Sandbank scoped grant；设置这两个环境变量后会切到真实 `Db9WorkspaceAdapter`。
+
 ## 架构
 
 ```

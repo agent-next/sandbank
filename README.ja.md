@@ -31,6 +31,29 @@ await provider.destroy(sandbox.id)
 
 Sandbank Cloud は推奨デフォルト provider です。`SandbankCloudAdapter` を `DaytonaAdapter`、`FlyioAdapter`、`CloudflareAdapter` に差し替えても sandbox create/exec のコードを書き換える必要はありません。harness 層では、各 provider を Agent の永続的な居場所ではなく compute backend として扱います。
 
+## Sandbank App Kernel
+
+Sandbank は AI App Kernel も提供します。新しい AI App は、Object、permission、operation、approval、audit、view model を 1 つの App Manifest と Capability Contract で記述し、同じ capability を Web Chat、Codex、Cloud Code、MCP、CLI、SDK に投影します。アプリ固有の業務ロジックは capability handler に書きますが、runtime orchestration、workspace state、DB9/Postgres gateway access、Tool Use projection、scoped grant、branch-first write、approval flow をアプリごとに書き直す必要はありません。
+
+推奨フロー：
+
+```bash
+# 新しい AI App を作る前に agent にこの skill を読ませる
+skills/create-sandbank-ai-app/SKILL.md
+
+# App Kernel scaffold を生成
+pnpm --filter sandbank exec tsx src/cli/index.ts create app <app-id> --out examples/<app-id>
+```
+
+[`examples/notes-ai-app`](./examples/notes-ai-app) は dogfood example です。`notes.list`、`notes.inspect`、`notes.proposeChange`、`notes.applyProposal` を同じ capability contract で実行し、approval が渡されるまで proposal が user-visible data を変更しないことを検証します。
+
+```bash
+pnpm --filter @sandbank.example/notes-ai-app typecheck
+pnpm --filter @sandbank.example/notes-ai-app verify
+```
+
+`DB9_TOKEN` / `DB9_DB_ID` がない場合、example は local DB9-compatible workspace と一時 Sandbank scoped grant を使います。これらの env var を設定すると `Db9WorkspaceAdapter` で実行します。
+
 ## アーキテクチャ
 
 ```
