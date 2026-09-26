@@ -45,7 +45,7 @@ const mockState = vi.hoisted(() => {
     const box: any = {
       id: info.id,
       name: info.name,
-      info: vi.fn(() => info),
+      info: vi.fn(async () => info),
       exec: vi.fn(async () => makeExecution()),
       start: vi.fn(async () => {
         info.state = { status: 'running', running: true }
@@ -101,8 +101,11 @@ const mockState = vi.hoisted(() => {
         return box
       }),
       get: vi.fn(async (id: string) => runtime.boxes.get(id) ?? null),
-      getInfo: vi.fn(async (id: string) => runtime.boxes.get(id)?.info() ?? null),
-      listInfo: vi.fn(async () => Array.from(runtime.boxes.values()).map(box => box.info())),
+      getInfo: vi.fn(async (id: string) => {
+        const box = runtime.boxes.get(id)
+        return box ? await box.info() : null
+      }),
+      listInfo: vi.fn(async () => await Promise.all(Array.from(runtime.boxes.values()).map(box => box.info()))),
       remove: vi.fn(async (id: string) => {
         runtime.boxes.delete(id)
       }),
@@ -203,7 +206,7 @@ describe('BoxLiteLocalClient', () => {
       env: [{ key: 'FOO', value: 'bar' }],
       autoRemove: false,
       ports: [{ hostPort: 8080, guestPort: 80 }],
-      network: { mode: 'enabled', allowNet: ['example.com'] },
+      network: { outbound: { mode: 'enabled', allowNet: ['example.com'] } },
       secrets: [{ name: 'token', value: 'secret', placeholder: 'TOKEN_PLACEHOLDER' }],
       entrypoint: ['/bin/bash'],
       cmd: ['-lc', 'sleep infinity'],

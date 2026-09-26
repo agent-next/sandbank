@@ -13,7 +13,7 @@ import type {
 type BoxliteRuntime = ReturnType<typeof JsBoxlite.withDefaultConfig>
 type NativeBox = Awaited<ReturnType<BoxliteRuntime['create']>>
 type NativeExecution = Awaited<ReturnType<NativeBox['exec']>>
-type NativeBoxInfo = ReturnType<NativeBox['info']>
+type NativeBoxInfo = Awaited<ReturnType<NativeBox['info']>>
 type NativeBoxOptions = Parameters<BoxliteRuntime['create']>[0]
 
 function expandHomeDir(path?: string): string | undefined {
@@ -76,8 +76,10 @@ function createBoxOptions(params: BoxLiteCreateParams): NativeBoxOptions {
     ports: params.ports?.map(([hostPort, guestPort]) => ({ hostPort, guestPort })),
     network: params.network
       ? {
-          mode: params.network.mode,
-          ...(params.network.allow_net ? { allowNet: params.network.allow_net } : {}),
+          outbound: {
+            mode: params.network.mode,
+            ...(params.network.allow_net ? { allowNet: params.network.allow_net } : {}),
+          },
         }
       : undefined,
     secrets: params.secrets?.map(secret => ({
@@ -189,7 +191,7 @@ export function createBoxLiteLocalClient(config: BoxLiteLocalConfig): BoxLiteCli
 
   async function getBoxInfo(boxId: string): Promise<NativeBoxInfo> {
     const cached = boxes.get(boxId)
-    if (cached) return cached.info()
+    if (cached) return await cached.info()
 
     const info = await runtime.getInfo(boxId)
     if (info) return info
@@ -197,7 +199,7 @@ export function createBoxLiteLocalClient(config: BoxLiteLocalConfig): BoxLiteCli
     const fresh = await runtime.get(boxId)
     if (!fresh) throw new Error(`Box not found: ${boxId}`)
     boxes.set(boxId, fresh)
-    return fresh.info()
+    return await fresh.info()
   }
 
   async function refreshBox(boxId: string): Promise<NativeBox> {
@@ -208,7 +210,7 @@ export function createBoxLiteLocalClient(config: BoxLiteLocalConfig): BoxLiteCli
   }
 
   async function startCreatedBox(box: NativeBox): Promise<NativeBox> {
-    const status = normalizeStatus(box.info())
+    const status = normalizeStatus(await box.info())
     if (status === 'running') return box
 
     if (status === 'configured' || status === 'stopped' || status === 'paused') {
@@ -247,7 +249,7 @@ export function createBoxLiteLocalClient(config: BoxLiteLocalConfig): BoxLiteCli
     async createBox(params: BoxLiteCreateParams): Promise<BoxLiteBox> {
       const box = await startCreatedBox(await runtime.create(createBoxOptions(params), params.name ?? null))
       boxes.set(box.id, box)
-      return mapBoxInfo(box.info())
+      return mapBoxInfo(await box.info())
     },
 
     async getBox(boxId: string): Promise<BoxLiteBox> {
@@ -376,7 +378,7 @@ export function createBoxLiteLocalClient(config: BoxLiteLocalConfig): BoxLiteCli
       const box = await getNativeBox(boxId)
       const cloned = await box.cloneBox({}, name ?? null)
       boxes.set(cloned.id, cloned)
-      return mapBoxInfo(cloned.info())
+      return mapBoxInfo(await cloned.info())
     },
 
     async getMetrics(): Promise<Record<string, unknown>> {
