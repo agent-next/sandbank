@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
 import type { Sandbox, SandboxInfo, SandboxProvider } from '@sandbank.dev/core'
-import { createServer, defaultRegistry, UI_MIME, UI_URI } from '../src/index.js'
+import { createServer, defaultRegistry, UI_MIME, UI_URI, VIEW_URI } from '../src/index.js'
 import { startHttp } from '../src/http.js'
 import type { ProviderRegistry } from '../src/index.js'
 
@@ -49,7 +49,7 @@ function fakeProvider(): SandboxProvider {
 }
 
 async function connect(registry: ProviderRegistry) {
-  const server = createServer({ registry, html: '<html>console</html>' })
+  const server = createServer({ registry, html: '<html>console</html>', viewHtml: '<html>view</html>' })
   const client = new Client({ name: 't', version: '0' })
   const [a, b] = InMemoryTransport.createLinkedPair()
   await Promise.all([server.connect(a), client.connect(b)])
@@ -66,15 +66,18 @@ describe('sandbank mcp server', () => {
     off: { configured: false, get: () => fake },
   }
 
-  it('lists tools; only render_console has a ui resourceUri', async () => {
+  it('lists tools; render_console and render_view have a ui resourceUri', async () => {
     const c = await connect(registry)
     const { tools } = await c.listTools()
     expect(tools.map((t) => t.name).sort()).toEqual(
-      ['file_read', 'file_write', 'port_expose', 'providers_list', 'render_console', 'sandbox_create', 'sandbox_destroy', 'sandbox_exec', 'sandbox_list'],
+      ['file_read', 'file_write', 'port_expose', 'providers_list', 'render_console', 'render_view', 'sandbox_create', 'sandbox_destroy', 'sandbox_exec', 'sandbox_list'],
     )
     const withUi = tools.filter((t) => (t._meta as any)?.ui?.resourceUri)
-    expect(withUi.map((t) => t.name)).toEqual(['render_console'])
-    expect((withUi[0]!._meta as any).ui.resourceUri).toBe(UI_URI)
+    expect(withUi.map((t) => t.name).sort()).toEqual(['render_console', 'render_view'])
+    expect((withUi.find((t) => t.name === 'render_console')!._meta as any).ui.resourceUri).toBe(UI_URI)
+    const view = withUi.find((t) => t.name === 'render_view')!
+    expect((view._meta as any).ui.resourceUri).toBe(VIEW_URI)
+    expect(view.description).toContain('Stack')
   })
 
   it('runs every tool', async () => {
@@ -125,10 +128,20 @@ describe('sandbank mcp server', () => {
   it('serves the ui resource with mimeType and csp', async () => {
     const c = await connect(registry)
     const { resources } = await c.listResources()
-    expect(resources.map((r) => r.uri)).toEqual([UI_URI])
+    expect(resources.map((r) => r.uri).sort()).toEqual([UI_URI, VIEW_URI].sort())
     const { contents } = await c.readResource({ uri: UI_URI })
     expect(contents[0]).toMatchObject({ uri: UI_URI, mimeType: UI_MIME, text: '<html>console</html>' })
     expect((contents[0]!._meta as any).ui.csp.frameDomains).toEqual(['https://*.sbx.agent-next.com'])
+  })
+
+  it('serves the view resource and render_view echoes the program', async () => {
+    const c = await connect(registry)
+    const { contents } = await c.readResource({ uri: VIEW_URI })
+    expect(contents[0]).toMatchObject({ uri: VIEW_URI, mimeType: UI_MIME, text: '<html>view</html>' })
+    expect((contents[0]!._meta as any).ui.csp.frameDomains).toEqual(['https://*.sbx.agent-next.com'])
+    const r = await call(c, 'render_view', { openui: 'root = Stack([])', title: 'T' })
+    expect(r.structuredContent).toEqual({ openui: 'root = Stack([])', title: 'T' })
+    expect(r.content[0]!.text).toContain('T')
   })
 
   it('keeps listing other providers when one is down', async () => {

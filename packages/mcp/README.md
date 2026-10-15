@@ -22,6 +22,7 @@ Claude Code: `claude mcp add sandbank -- npx -y @sandbank.dev/mcp`
 | `sandbox_exec` | run a command, returns exit code, stdout, stderr, duration |
 | `file_read` / `file_write` | utf8 or base64 file transfer |
 | `port_expose` | URL for a sandbox port |
+| `render_view` | renders an OpenUI Lang program (`ui://sandbank/view-v1.html`) |
 | `render_console` | opens the interactive console (`ui://sandbank/console-v1.html`, mimeType `text/html;profile=mcp-app`) |
 
 Every tool returns `structuredContent` plus a text summary; failures return `isError: true`.

@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [main]
 
+env:
+  OPENUI_TELEMETRY_DISABLED: '1'
+
 jobs:
   typecheck:
     name: Typecheck
@@ -26,6 +29,7 @@ jobs:
       - run: pnpm --filter @sandbank.dev/e2b build
       - run: pnpm --filter @sandbank.dev/docker build
       - run: pnpm --filter @sandbank.dev/sbx build
+      - run: pnpm --filter @sandbank.dev/openui-view build
       - run: pnpm typecheck
 
   test:
@@ -39,6 +43,7 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @sandbank.dev/openui-view build
       - run: pnpm test
         env:
           DOCKER_INTEGRATION: '1'

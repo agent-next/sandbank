@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
+import { getCatalogPrompt } from '@sandbank.dev/openui-view'
 import { withPortExpose } from '@sandbank.dev/core'
 import type { Sandbox, SandboxInfo, SandboxProvider } from '@sandbank.dev/core'
 import { z } from 'zod'
@@ -8,6 +9,7 @@ import { defaultRegistry } from './registry.js'
 import type { ProviderRegistry } from './registry.js'
 
 export const UI_URI = 'ui://sandbank/console-v1.html'
+export const VIEW_URI = 'ui://sandbank/view-v1.html'
 export const UI_MIME = 'text/html;profile=mcp-app'
 const UI_CSP = { frameDomains: ['https://*.sbx.agent-next.com'] }
 const TEXT_LIMIT = 100_000
@@ -25,6 +27,8 @@ export interface CreateServerOptions {
   registry?: ProviderRegistry
   /** Console HTML; defaults to ./ui/console.html next to this module. */
   html?: string | (() => string)
+  /** OpenUI view HTML; defaults to ./ui/view.html next to this module. */
+  viewHtml?: string | (() => string)
 }
 
 const row = (provider: string, s: SandboxInfo | Sandbox, image = ''): SandboxRow => ({
@@ -180,6 +184,24 @@ export function createServer(options: CreateServerOptions = {}): McpServer {
     },
     { ui: { resourceUri: UI_URI } },
   )
+
+  tool(
+    'render_view',
+    `Render a generative result view (comparisons, tables, metrics, multi-step results) for the user.\n\n${getCatalogPrompt()}`,
+    { openui: z.string().describe('OpenUI Lang program'), title: z.string().optional() },
+    async ({ openui, title }) => ok(`Rendered view${title ? `: ${title}` : ''}`, { openui, ...(title ? { title } : {}) }),
+    { ui: { resourceUri: VIEW_URI } },
+  )
+
+  const serveHtml = (name: string, uri: string, description: string, html: string | (() => string) | undefined, file: string) =>
+    server.registerResource(name, uri, { mimeType: UI_MIME, description }, async (u) => {
+      const h = html ?? (() => readFileSync(new URL(file, import.meta.url), 'utf8'))
+      return {
+        contents: [{ uri: u.href, mimeType: UI_MIME, text: typeof h === 'function' ? h() : h, _meta: { ui: { csp: UI_CSP } } }],
+      }
+    })
+
+  serveHtml('sandbank-view', VIEW_URI, 'Sandbank generative view', options.viewHtml, './ui/view.html')
 
   server.registerResource(
     'sandbank-console',
