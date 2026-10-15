@@ -5,6 +5,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { Renderer } from '@openuidev/react-lang'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { getCatalogPrompt, library, RENDER_VIEW_EXAMPLE } from '../src/index.js'
+import { READ_ONLY_TOOLS } from '../src/catalog.js'
 
 const pkg = resolve(__dirname, '..')
 
@@ -34,6 +35,15 @@ describe('openui-view catalog', () => {
     expect(html).toContain('b.ts')
     expect(html).toContain('340')
     expect(html).toContain('Re-run')
+  })
+
+  it('names the tool on every ActionButton and gates state-changing tools', () => {
+    const html = renderToStaticMarkup(
+      <Renderer library={library} isStreaming={false}
+        response={'root = Stack([b])\nb = ActionButton("Re-run", "sandbox_destroy", {"provider": "docker", "id": "x"})'} />,
+    )
+    expect(html).toContain('title="Calls sandbox_destroy"')
+    for (const t of ['sandbox_destroy', 'sandbox_exec', 'sandbox_create', 'file_write']) expect(READ_ONLY_TOOLS.has(t)).toBe(false)
   })
 
   it('renders a BarChart as inline SVG', () => {

@@ -12,6 +12,7 @@ function View() {
   const [streaming, setStreaming] = useState(false)
   useEffect(() => {
     const onMsg = (e: MessageEvent<HostMessage>) => {
+      if (e.source !== window.parent) return
       const m = e.data
       if (m?.jsonrpc !== '2.0') return
       if (m.method === 'ui/notifications/tool-result') {

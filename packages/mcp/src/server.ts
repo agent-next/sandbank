@@ -188,7 +188,7 @@ export function createServer(options: CreateServerOptions = {}): McpServer {
   tool(
     'render_view',
     `Render a generative result view (comparisons, tables, metrics, multi-step results) for the user.\n\n${getCatalogPrompt()}`,
-    { openui: z.string().describe('OpenUI Lang program'), title: z.string().optional() },
+    { openui: z.string().max(TEXT_LIMIT).describe('OpenUI Lang program'), title: z.string().max(200).optional() },
     async ({ openui, title }) => ok(`Rendered view${title ? `: ${title}` : ''}`, { openui, ...(title ? { title } : {}) }),
     { ui: { resourceUri: VIEW_URI } },
   )

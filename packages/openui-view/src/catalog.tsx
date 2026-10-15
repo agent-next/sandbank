@@ -133,6 +133,9 @@ export const Link = defineComponent({
   ),
 })
 
+/** Tools an ActionButton may call with one click; everything else asks for confirmation. */
+export const READ_ONLY_TOOLS = new Set(['providers_list', 'sandbox_list', 'file_read', 'port_expose', 'render_console', 'render_view'])
+
 type Pending = { resolve: (v: unknown) => void; reject: (e: Error) => void }
 const pending = new Map<number, Pending>()
 let nextId = 1000
@@ -173,8 +176,14 @@ export const ActionButton = defineComponent({
     args: z.record(z.string(), z.any()).optional().describe('Tool arguments object'),
   }),
   component: ({ props }) => {
-    const [state, setState] = useState<{ status: 'idle' | 'busy' | 'ok' | 'err'; text?: string }>({ status: 'idle' })
+    const [state, setState] = useState<{ status: 'idle' | 'confirm' | 'busy' | 'ok' | 'err'; text?: string }>({ status: 'idle' })
+    // The program is model-authored: anything that changes state needs a second, explicit click naming the tool.
+    const needsConfirm = !READ_ONLY_TOOLS.has(props.tool)
     const click = () => {
+      if (needsConfirm && state.status !== 'confirm') {
+        setState({ status: 'confirm' })
+        return
+      }
       setState({ status: 'busy' })
       callTool(props.tool, props.args ?? {}).then(
         (r) => setState({ status: (r as { isError?: boolean })?.isError ? 'err' : 'ok', text: summarize(r) }),
@@ -183,9 +192,12 @@ export const ActionButton = defineComponent({
     }
     return (
       <div className="action">
-        <button type="button" onClick={click} disabled={state.status === 'busy'}>
-          {state.status === 'busy' ? `${props.label}…` : props.label}
+        <button type="button" onClick={click} disabled={state.status === 'busy'} title={`Calls ${props.tool}`}>
+          {state.status === 'busy' ? `${props.label}…` : state.status === 'confirm' ? `Confirm: ${props.tool}` : props.label}
         </button>
+        {state.status === 'confirm'
+          ? <button type="button" onClick={() => setState({ status: 'idle' })}>Cancel</button>
+          : null}
         {state.text ? <pre className={state.status === 'err' ? 'err' : ''}>{state.text}</pre> : null}
       </div>
     )
