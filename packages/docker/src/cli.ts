@@ -10,24 +10,24 @@ export interface DockerRunResult {
 export interface DockerRunOptions {
   input?: Uint8Array
   timeoutMs?: number
-  /** Extra environment for the docker process (used for `-e NAME` passthrough). */
-  env?: Record<string, string>
+}
+
+export interface DockerStreamOptions {
+  /** Called when the consumer cancels, after the local docker client is killed. */
+  onCancel?: () => void
 }
 
 /** Runs the docker CLI. Injectable so tests can stand in for a daemon. */
 export interface DockerCli {
   run(args: string[], options?: DockerRunOptions): Promise<DockerRunResult>
-  stream(args: string[]): ReadableStream<Uint8Array>
+  stream(args: string[], options?: DockerStreamOptions): ReadableStream<Uint8Array>
 }
 
 export function createDockerCli(binary = 'docker'): DockerCli {
   return {
     run(args, options) {
       return new Promise((resolve, reject) => {
-        const child = spawn(binary, args, {
-          stdio: ['pipe', 'pipe', 'pipe'],
-          env: options?.env ? { ...process.env, ...options.env } : process.env,
-        })
+        const child = spawn(binary, args, { stdio: ['pipe', 'pipe', 'pipe'] })
         const stdout: Buffer[] = []
         const stderr: Buffer[] = []
         let timedOut = false
@@ -51,19 +51,27 @@ export function createDockerCli(binary = 'docker'): DockerCli {
       })
     },
 
-    stream(args) {
+    stream(args, options) {
       const child = spawn(binary, args, { stdio: ['ignore', 'pipe', 'pipe'] })
+      let finished = false
       return new ReadableStream<Uint8Array>({
         start(controller) {
           let open = 2
-          const done = () => { if (--open === 0) controller.close() }
           for (const source of [child.stdout, child.stderr]) {
-            source.on('data', (chunk: Buffer) => controller.enqueue(new Uint8Array(chunk)))
-            source.on('end', done)
+            source.on('data', (chunk: Buffer) => { if (!finished) controller.enqueue(new Uint8Array(chunk)) })
+            source.on('end', () => {
+              if (--open === 0 && !finished) { finished = true; controller.close() }
+            })
           }
-          child.on('error', err => controller.error(err))
+          child.on('error', (err) => {
+            if (!finished) { finished = true; controller.error(err) }
+          })
         },
-        cancel() { child.kill('SIGKILL') },
+        cancel() {
+          finished = true
+          child.kill('SIGKILL')
+          options?.onCancel?.()
+        },
       })
     },
   }

@@ -1,3 +1,4 @@
+import { existsSync, readFileSync } from 'node:fs'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ExecTimeoutError, ProviderError, SandboxNotFoundError } from '@sandbank.dev/core'
 import { DockerAdapter } from '../src/adapter.js'
@@ -57,8 +58,14 @@ describe('DockerAdapter', () => {
   })
 
   describe('createSandbox', () => {
-    it('runs a labeled long-lived container and keeps env values out of argv', async () => {
-      const { cli, calls } = daemon()
+    it('runs a labeled long-lived container and passes env through a private env file', async () => {
+      let envFileContent = ''
+      const { cli, calls } = daemon({
+        run: (args) => {
+          envFileContent = readFileSync(args[args.indexOf('--env-file') + 1]!, 'utf8')
+          return ok('abcdef1234567890\n')
+        },
+      })
       const sandbox = await new DockerAdapter({}, cli).createSandbox({
         image: 'node:22',
         env: { TOKEN: 'secret-value' },
@@ -70,14 +77,15 @@ describe('DockerAdapter', () => {
       const run = calls[0]!
       expect(run.args).toEqual([
         'run', '-d', '--init', '--label', 'sandbank.managed=true',
-        '-e', 'TOKEN',
+        '--env-file', expect.stringMatching(/sandbank-env-.+\/env$/),
         '--cpus', '2', '--memory', '512m',
         '-p', '127.0.0.1:8080:3000',
         '-v', 'data:/data',
         '--entrypoint', 'tail', 'node:22', '-f', '/dev/null',
       ])
       expect(run.args.join(' ')).not.toContain('secret-value')
-      expect(run.options?.env).toEqual({ TOKEN: 'secret-value' })
+      expect(envFileContent).toBe('TOKEN=secret-value\n')
+      expect(existsSync(run.args[run.args.indexOf('--env-file') + 1]!)).toBe(false)
 
       expect(sandbox.id).toBe('abcdef123456')
       expect(sandbox.state).toBe('running')
@@ -93,6 +101,12 @@ describe('DockerAdapter', () => {
         '--gpus', 'all',
         '--entrypoint', 'sleep', 'alpine:3.20', '120',
       ])
+    })
+
+    it('rejects multi-line env values instead of corrupting the env file', async () => {
+      const { cli } = daemon()
+      await expect(new DockerAdapter({}, cli).createSandbox({ env: { KEY: 'a\nb' } })).rejects.toThrow(/single-line/)
+      expect(cli.run).not.toHaveBeenCalled()
     })
 
     it('wraps docker failures in ProviderError', async () => {
@@ -148,20 +162,38 @@ describe('DockerAdapter', () => {
         exec: () => ({ exitCode: 3, stdout: encoder.encode('out'), stderr: 'err', timedOut: false }),
       })
       expect(await sandbox.exec('false', { cwd: '/w', timeout: 5000 })).toEqual({ exitCode: 3, stdout: 'out', stderr: 'err' })
-      expect(calls[0]!.args).toEqual(['exec', '-w', '/w', 'abcdef123456', 'sh', '-c', 'false'])
+      const args = calls[0]!.args
+      expect(args.slice(0, 5)).toEqual(['exec', '-w', '/w', 'abcdef123456', 'sh'])
+      expect(args.at(-2)).toMatch(/^\/tmp\/\.sandbank-exec-[0-9a-f-]+\.pid$/)
+      expect(args.at(-1)).toBe('false')
       expect(calls[0]!.options).toEqual({ timeoutMs: 5000 })
     })
 
-    it('exec raises ExecTimeoutError on timeout', async () => {
-      const { sandbox } = await sandboxWith({
-        exec: () => ({ exitCode: -1, stdout: new Uint8Array(), stderr: '', timedOut: true }),
+    it('exec raises ExecTimeoutError and kills the process tree it started', async () => {
+      const { sandbox, calls } = await sandboxWith({
+        exec: (args) => args.includes('sleep 9')
+          ? { exitCode: -1, stdout: new Uint8Array(), stderr: '', timedOut: true }
+          : ok(),
       })
       await expect(sandbox.exec('sleep 9', { timeout: 10 })).rejects.toBeInstanceOf(ExecTimeoutError)
+      const pidFile = calls[0]!.args.at(-2)
+      expect(calls[1]!.args.slice(0, 4)).toEqual(['exec', 'abcdef123456', 'sh', '-c'])
+      expect(calls[1]!.args.at(-1)).toBe(pidFile)
     })
 
-    it('exec raises SandboxNotFoundError when the container is gone', async () => {
-      const { sandbox } = await sandboxWith({ exec: () => fail('Error response from daemon: No such container: abc') })
+    it('exec raises SandboxNotFoundError only when the container is really gone', async () => {
+      let removed = false
+      const { sandbox } = await sandboxWith({
+        exec: () => fail('Error response from daemon: No such container: abc'),
+        container: () => removed ? fail('Error: No such container: abc') : ok(inspectJson()),
+      })
+      removed = true
       await expect(sandbox.exec('true')).rejects.toBeInstanceOf(SandboxNotFoundError)
+    })
+
+    it('exec returns user stderr that merely looks like a docker error', async () => {
+      const { sandbox } = await sandboxWith({ exec: () => fail('Error response from daemon: No such container: x') })
+      expect(await sandbox.exec('fake')).toMatchObject({ exitCode: 1 })
     })
 
     it('writeFile pipes bytes over stdin and never puts content in argv', async () => {
@@ -203,10 +235,14 @@ describe('DockerAdapter', () => {
       await expect(sandbox.exposePort!(3000)).rejects.toThrow(/ports: \[\[hostPort, 3000\]\]/)
     })
 
-    it('execStream delegates to the streaming CLI', async () => {
-      const { sandbox, cli } = await sandboxWith({})
+    it('execStream delegates to the streaming CLI and kills the tree on cancel', async () => {
+      const { sandbox, cli, calls } = await sandboxWith({})
       await sandbox.execStream!('ls', { cwd: '/' })
-      expect(cli.stream).toHaveBeenCalledWith(['exec', '-w', '/', 'abcdef123456', 'sh', '-c', 'ls'])
+      const [args, options] = vi.mocked(cli.stream).mock.calls[0]!
+      expect(args.slice(0, 5)).toEqual(['exec', '-w', '/', 'abcdef123456', 'sh'])
+      expect(args.at(-1)).toBe('ls')
+      options!.onCancel!()
+      await vi.waitFor(() => expect(calls.at(-1)!.args.at(-1)).toBe(args.at(-2)))
     })
   })
 
@@ -237,6 +273,19 @@ describe('DockerAdapter', () => {
       expect(await new DockerAdapter({}, listDaemon().cli).listSandboxes({ limit: 1 })).toHaveLength(1)
     })
 
+    it('skips containers that disappear between ps and inspect', async () => {
+      const { cli } = daemon({
+        ps: () => ok('aaaaaaaaaaaaaaaa\ngone\n'),
+        container: () => ({
+          exitCode: 1,
+          stdout: encoder.encode(inspectJson({ Id: 'aaaaaaaaaaaaaaaa' })),
+          stderr: 'Error: No such object: gone',
+          timedOut: false,
+        }),
+      })
+      expect((await new DockerAdapter({}, cli).listSandboxes()).map(s => s.id)).toEqual(['aaaaaaaaaaaa'])
+    })
+
     it('returns [] without calling inspect when nothing is managed', async () => {
       const { cli, calls } = daemon({ ps: () => ok('') })
       expect(await new DockerAdapter({}, cli).listSandboxes()).toEqual([])
@@ -245,14 +294,20 @@ describe('DockerAdapter', () => {
   })
 
   describe('destroySandbox', () => {
-    it('force-removes the container with its anonymous volumes', async () => {
+    it('force-removes a managed container with its anonymous volumes', async () => {
       const { cli, calls } = daemon()
       await new DockerAdapter({}, cli).destroySandbox('abc')
-      expect(calls[0]!.args).toEqual(['rm', '-f', '-v', 'abc'])
+      expect(calls.at(-1)!.args).toEqual(['rm', '-f', '-v', 'abcdef1234567890'])
+    })
+
+    it('never removes containers sandbank did not create', async () => {
+      const { cli, calls } = daemon({ container: () => ok(inspectJson({ Config: { Image: 'x', Labels: {} } })) })
+      await new DockerAdapter({}, cli).destroySandbox('prod-db')
+      expect(calls.some(c => c.args[0] === 'rm')).toBe(false)
     })
 
     it('is idempotent', async () => {
-      const { cli } = daemon({ rm: () => fail('Error: No such container: abc') })
+      const { cli } = daemon({ container: () => fail('Error: No such container: abc') })
       await expect(new DockerAdapter({}, cli).destroySandbox('abc')).resolves.toBeUndefined()
     })
 
@@ -268,6 +323,18 @@ describe('DockerAdapter', () => {
       expect(await new DockerAdapter({}, cli).createVolume({ name: 'data', sizeGB: 5 }))
         .toEqual({ id: 'data', name: 'data', sizeGB: 5, attachedTo: null })
       expect(calls[0]!.args).toEqual(['volume', 'create', '--label', 'sandbank.managed=true', 'data'])
+    })
+
+    it('deletes managed volumes', async () => {
+      const { cli, calls } = daemon({ volume: (args) => args[1] === 'inspect' ? ok('true\n') : ok() })
+      await new DockerAdapter({}, cli).deleteVolume('data')
+      expect(calls.at(-1)!.args).toEqual(['volume', 'rm', 'data'])
+    })
+
+    it('never deletes volumes sandbank did not create', async () => {
+      const { cli, calls } = daemon({ volume: () => ok('\n') })
+      await new DockerAdapter({}, cli).deleteVolume('prod-data')
+      expect(calls.some(c => c.args[1] === 'rm')).toBe(false)
     })
 
     it('deletes idempotently', async () => {

@@ -4,9 +4,11 @@
  * Opt in with DOCKER_INTEGRATION=1 (needs the docker CLI and a daemon).
  * Image: DOCKER_TEST_IMAGE, default alpine:3.20.
  */
+import { execFileSync } from 'node:child_process'
 import { afterAll, describe, expect, it } from 'vitest'
 import {
   createProvider,
+  ExecTimeoutError,
   SandboxNotFoundError,
   withPortExpose,
   withSleep,
@@ -50,6 +52,42 @@ describe.skipIf(!enabled)('DockerAdapter (real daemon)', () => {
     await provider.destroy(sandbox.id)
     await provider.destroy(sandbox.id)
     await expect(provider.get(sandbox.id)).rejects.toBeInstanceOf(SandboxNotFoundError)
+  })
+
+  it('passes env that would break the docker CLI (PATH) only to the container', async () => {
+    const sandbox = await create({ env: { PATH: '/opt/bin:/usr/bin:/bin', SPACED: 'a b=c' } })
+    expect((await sandbox.exec('echo "$PATH|$SPACED"')).stdout).toBe('/opt/bin:/usr/bin:/bin|a b=c\n')
+  })
+
+  it('kills the whole command tree on exec timeout', async () => {
+    const sandbox = await create()
+    await expect(sandbox.exec('sleep 1; touch /tmp/survived; sleep 50', { timeout: 300 }))
+      .rejects.toBeInstanceOf(ExecTimeoutError)
+    await new Promise(r => setTimeout(r, 1500))
+    expect((await sandbox.exec('test -e /tmp/survived')).exitCode).toBe(1)
+    expect((await sandbox.exec('ps -o args | grep -c "^sleep 50"')).stdout.trim()).toBe('0')
+  })
+
+  it('cancels a stream without crashing and stops the remote command', async () => {
+    const sandbox = withStreaming(await create())!
+    const reader = (await sandbox.execStream('while :; do echo hi; sleep 0.05; done')).getReader()
+    expect(new TextDecoder().decode((await reader.read()).value)).toContain('hi')
+    const running = 'ps -o args | grep -c "^sh -c while"'
+    expect((await sandbox.exec(running)).stdout.trim()).toBe('1')
+    await reader.cancel()
+    await new Promise(r => setTimeout(r, 500))
+    expect((await sandbox.exec(running)).stdout.trim()).toBe('0')
+  })
+
+  it('refuses to destroy containers it did not create', async () => {
+    const foreign = execFileSync('docker', ['run', '-d', '--rm', image, 'sleep', '60']).toString().trim()
+    try {
+      await provider.destroy(foreign)
+      expect(execFileSync('docker', ['inspect', '-f', '{{.State.Running}}', foreign]).toString().trim()).toBe('true')
+      await expect(provider.get(foreign)).rejects.toBeInstanceOf(SandboxNotFoundError)
+    } finally {
+      execFileSync('docker', ['rm', '-f', foreign])
+    }
   })
 
   it('round-trips binary files and archives', async () => {
