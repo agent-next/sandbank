@@ -212,6 +212,11 @@ describe('sandbank mcp hosted mode', () => {
       expect(await status(`/mcp/${token}`, '8080-abc.sbx.agent-next.com')).toBe(200)
       expect(await status('/mcp', '8080-abc.sbx.agent-next.com')).toBe(404)
       expect(await status(`/mcp/${'y'.repeat(40)}`, '8080-abc.sbx.agent-next.com')).toBe(404)
+      const preflight = await fetch(`http://127.0.0.1:${port}/mcp/${token}`, {
+        method: 'OPTIONS', headers: { origin: 'https://host.example', 'access-control-request-method': 'POST' },
+      })
+      expect(preflight.status).toBe(204)
+      expect(preflight.headers.get('access-control-allow-origin')).toBe('*')
     } finally {
       http.close()
     }
