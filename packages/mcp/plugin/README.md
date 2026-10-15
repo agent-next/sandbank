@@ -8,9 +8,8 @@ Contents:
 
 - `.claude-plugin/plugin.json`, `.mcp.json`: Claude Code manifest and MCP
   config (launches `npx -y @sandbank.dev/mcp`, passes `SBX_API_KEY` through).
-- `../skill/SKILL.md`: the usage skill. Copy or symlink it to
-  `skills/sandbank/SKILL.md` inside the installed plugin (or into
-  `~/.claude/skills/sandbank/`) so the agent loads it.
+- `skills/sandbank/SKILL.md`: the usage skill, loaded automatically with the
+  plugin.
 
 ## Requirements
 
@@ -40,4 +39,4 @@ env_vars = ["SBX_API_KEY"]
 ```
 
 `env_vars` forwards the variable from your shell; do not write the key into
-the file. Put the skill at `~/.codex/skills/sandbank/SKILL.md`.
+the file. Copy `skills/sandbank/SKILL.md` to `~/.codex/skills/sandbank/SKILL.md`.
