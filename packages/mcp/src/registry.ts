@@ -20,8 +20,11 @@ function lazy(configured: boolean, make: () => SandboxProvider): ProviderEntry {
 const isSet = (v?: string) => Boolean(v) && !v!.startsWith('${')
 
 export function defaultRegistry(env: NodeJS.ProcessEnv = process.env): ProviderRegistry {
-  return {
+  const all: ProviderRegistry = {
     docker: lazy(true, () => createProvider(new DockerAdapter())),
     sbx: lazy(isSet(env.SBX_API_KEY) || isSet(env.E2B_API_KEY), () => createProvider(new SbxAdapter())),
   }
+  // SANDBANK_MCP_PROVIDERS=sbx limits what the server exposes (e.g. hide docker on a hosted server).
+  const only = env.SANDBANK_MCP_PROVIDERS?.split(',').map((s) => s.trim()).filter(Boolean)
+  return only ? Object.fromEntries(Object.entries(all).filter(([name]) => only.includes(name))) : all
 }

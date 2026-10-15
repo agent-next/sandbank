@@ -194,3 +194,30 @@ describe('sandbank mcp --http', () => {
     }
   })
 })
+
+describe('sandbank mcp hosted mode', () => {
+  it('serves only /mcp/<token>, from any Host', async () => {
+    const port = 40000 + Math.floor(Math.random() * 1000)
+    const token = 'x'.repeat(40)
+    const http = await startHttp(port, { registry: {}, html: '' }, { token })
+    try {
+      const body = JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' })
+      const status = (path: string, host: string) => new Promise<number>((resolve, reject) => {
+        const req = request({ host: '127.0.0.1', port, path, method: 'POST', headers: {
+          host, 'content-type': 'application/json', accept: 'application/json, text/event-stream',
+        } }, (res) => { res.resume(); resolve(res.statusCode ?? 0) })
+        req.on('error', reject)
+        req.end(body)
+      })
+      expect(await status(`/mcp/${token}`, '8080-abc.sbx.agent-next.com')).toBe(200)
+      expect(await status('/mcp', '8080-abc.sbx.agent-next.com')).toBe(404)
+      expect(await status(`/mcp/${'y'.repeat(40)}`, '8080-abc.sbx.agent-next.com')).toBe(404)
+    } finally {
+      http.close()
+    }
+  })
+
+  it('limits providers with SANDBANK_MCP_PROVIDERS', () => {
+    expect(Object.keys(defaultRegistry({ SANDBANK_MCP_PROVIDERS: 'sbx', SBX_API_KEY: 'k' }))).toEqual(['sbx'])
+  })
+})
