@@ -8,7 +8,7 @@ description: Run code and commands in disposable sandboxes through the Sandbank 
 The `@sandbank.dev/mcp` server creates disposable sandboxes on two providers
 and shows them in an inline console. Tools: `providers_list`, `sandbox_create`,
 `sandbox_list`, `sandbox_exec`, `file_read`, `file_write`, `port_expose`,
-`sandbox_destroy`, `render_console`.
+`sandbox_destroy`, `render_console`, `render_view`.
 
 ## Pick a provider
 
@@ -71,6 +71,15 @@ over; `render_console` renders it for the user. Call it:
 Do not call it after every step. It adds no information for you, and a host
 without MCP Apps support shows only a text summary, so always state the key
 facts (id, url, exit code) in your own reply too.
+
+## `render_view` vs `render_console`
+
+- `render_console`: manage sandboxes (list, focus, destroy).
+- `render_view`: show a computed result as a generative view: comparisons,
+  tables, metrics, bar charts, multi-step results with logs. Pass an OpenUI
+  Lang program in `openui` (component catalog is in the tool description) and
+  an optional `title`. Use only real tool names and full arguments in
+  `ActionButton`. Still state the key facts in your reply.
 
 ## Errors
 

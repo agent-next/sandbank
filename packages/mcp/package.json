@@ -31,7 +31,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc && rm -rf dist/ui && cp -r src/ui dist/ui",
+    "build": "pnpm --filter @sandbank.dev/openui-view build && tsc && rm -rf dist/ui && cp -r src/ui dist/ui && cp ../openui-view/dist/view.html dist/ui/view.html",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"
   },
@@ -39,6 +39,7 @@
     "@modelcontextprotocol/sdk": "1.32.1",
     "@sandbank.dev/core": "workspace:*",
     "@sandbank.dev/docker": "workspace:*",
+    "@sandbank.dev/openui-view": "workspace:*",
     "@sandbank.dev/sbx": "workspace:*",
     "zod": "^3.25.76"
   },
