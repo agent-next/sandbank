@@ -5,6 +5,9 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- `@sandbank.dev/sbx` — agent-next sandbox (sbx) adapter: E2B-compatible cloud sandbox with sbx endpoints, `SBX_API_KEY`, and kill-on-timeout defaults
+- `@sandbank.dev/docker` — local Docker container adapter over the `docker` CLI: exec/stream, files, pause/unpause, published ports, named volumes, `--rm` auto-destroy
+- `E2BAdapterConfig.apiUrl` so E2B-compatible endpoints are not overridden by a global `E2B_API_URL`
 - `connectTerminal()` in `@sandbank.dev/core` — wraps ttyd WebSocket binary protocol into `TerminalSession` interface with `write`/`onData`/`resize`/`close`
 - GitHub Actions CI workflows (PR checks, integration tests, npm release)
 - Vitest resolve aliases for cross-package imports without build step

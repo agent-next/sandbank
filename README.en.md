@@ -72,7 +72,9 @@ Sandbank Cloud is the recommended default provider. Swap `SandbankCloudAdapter` 
 | [`@sandbank.dev/flyio`](./packages/flyio) | Fly.io Machines adapter |
 | [`@sandbank.dev/cloudflare`](./packages/cloudflare) | Cloudflare Workers adapter |
 | [`@sandbank.dev/boxlite`](./packages/boxlite) | BoxLite self-hosted Docker adapter |
+| [`@sandbank.dev/docker`](./packages/docker) | Local Docker container adapter (CLI, no SDK) |
 | [`@sandbank.dev/e2b`](./packages/e2b) | E2B cloud sandbox adapter |
+| [`@sandbank.dev/sbx`](./packages/sbx) | agent-next sandbox (sbx) adapter, E2B-compatible cloud sandbox |
 | [`@sandbank.dev/db9`](./packages/db9) | db9.ai serverless PostgreSQL adapter (ServiceProvider) |
 | [`@sandbank.dev/relay`](./packages/relay) | WebSocket relay for multi-agent communication |
 | [`@sandbank.dev/agent`](./packages/agent) | Lightweight client for agents running inside sandboxes |
@@ -83,28 +85,28 @@ Sandbank Cloud is the recommended default provider. Swap `SandbankCloudAdapter` 
 
 All providers implement these — the minimum contract:
 
-| Operation | Sandbank Cloud | Daytona | Fly.io | Cloudflare | BoxLite | E2B |
-|-----------|:--------------:|:-------:|:------:|:----------:|:-------:|:---:|
-| Create / Destroy | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| List sandboxes | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Execute commands | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Read / Write files | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Skill injection | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Operation | Sandbank Cloud | Daytona | Fly.io | Cloudflare | BoxLite | E2B | sbx | Docker |
+|-----------|:--------------:|:-------:|:------:|:----------:|:-------:|:---:|:---:|:---:|
+| Create / Destroy | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| List sandboxes | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Execute commands | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Read / Write files | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Skill injection | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 
 ### Extended Capabilities
 
 Capabilities are opt-in. Use `withVolumes(provider)`, `withPortExpose(sandbox)`, etc. to safely check and access them at runtime.
 
-| Capability | Sandbank Cloud | Daytona | Fly.io | Cloudflare | BoxLite | E2B | db9 | Description |
-|------------|:--------------:|:-------:|:------:|:----------:|:-------:|:---:|:---:|-------------|
-| `volumes` | ❌ | ✅ | ✅ | ⚠️* | ❌ | ⚠️*** | — | Persistent volume management |
-| `port.expose` | ✅ | ✅ | ✅ | ⚠️** | ✅ | ✅ | — | Expose sandbox ports to the internet |
-| `exec.stream` | ✅ | ❌ | ❌ | ✅ | ✅ | ❌ | — | Stream stdout/stderr in real-time |
-| `snapshot` | ❌ | ❌ | ❌ | ✅ | ✅ | ❌ | — | Snapshot and restore sandbox state |
-| `terminal` | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | — | Interactive web terminal (ttyd) |
-| `sleep` | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ | — | Hibernate and wake sandboxes |
-| `skills` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | Load and inject skill definitions into sandboxes |
-| `services` | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | Bind data services (PostgreSQL) to sandboxes |
+| Capability | Sandbank Cloud | Daytona | Fly.io | Cloudflare | BoxLite | E2B | sbx | Docker | db9 | Description |
+|------------|:--------------:|:-------:|:------:|:----------:|:-------:|:---:|:---:|:---:|:---:|-------------|
+| `volumes` | ❌ | ✅ | ✅ | ⚠️* | ❌ | ⚠️*** | ❌ | ✅ | — | Persistent volume management |
+| `port.expose` | ✅ | ✅ | ✅ | ⚠️** | ✅ | ✅ | ✅ | ✅ | — | Expose sandbox ports to the internet |
+| `exec.stream` | ✅ | ❌ | ❌ | ✅ | ✅ | ❌ | ❌ | ✅ | — | Stream stdout/stderr in real-time |
+| `snapshot` | ❌ | ❌ | ❌ | ✅ | ✅ | ❌ | ❌ | ❌ | — | Snapshot and restore sandbox state |
+| `terminal` | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | — | Interactive web terminal (ttyd) |
+| `sleep` | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ | ✅ | ✅ | — | Hibernate and wake sandboxes |
+| `skills` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | Load and inject skill definitions into sandboxes |
+| `services` | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | Bind data services (PostgreSQL) to sandboxes |
 
 \* Cloudflare `volumes` requires `storage` option in adapter config.
 
@@ -114,14 +116,14 @@ Capabilities are opt-in. Use `withVolumes(provider)`, `withPortExpose(sandbox)`,
 
 ### Provider Characteristics
 
-| | Sandbank Cloud | Daytona | Fly.io | Cloudflare | BoxLite | E2B |
-|---|----------------|---------|--------|------------|---------|-----|
-| **Positioning** | Recommended default provider | Cloud sandbox | VM/microVM | Edge Worker | Self-hosted BoxLite | Cloud sandbox |
-| **Runtime** | Hosted BoxLite containers | Full VM | Firecracker microVM | V8 isolate + container | Docker container | E2B cloud sandbox |
-| **Cold start** | Managed-service optimized | ~10s | ~3-5s | ~1s | ~2-5s | Provider-managed |
-| **File I/O** | Archive API | Native SDK | Via exec (base64) | Native SDK | Via exec (base64) | Native SDK |
-| **Regions** | Sandbank-managed | Multi | Multi | Global edge | Self-hosted | E2B managed |
-| **External deps** | `@sandbank.dev/cloud` + API token/x402 | `@daytonaio/sdk` | None (pure fetch) | `@cloudflare/sandbox` | BoxLite API | `e2b` |
+| | Sandbank Cloud | Daytona | Fly.io | Cloudflare | BoxLite | E2B | sbx | Docker |
+|---|----------------|---------|--------|------------|---------|-----|---|---|
+| **Positioning** | Recommended default provider | Cloud sandbox | VM/microVM | Edge Worker | Self-hosted BoxLite | Cloud sandbox | agent-next cloud sandbox | Local / self-hosted |
+| **Runtime** | Hosted BoxLite containers | Full VM | Firecracker microVM | V8 isolate + container | Docker container | E2B cloud sandbox | E2B-compatible cloud sandbox (CPU/GPU) | Docker container |
+| **Cold start** | Managed-service optimized | ~10s | ~3-5s | ~1s | ~2-5s | Provider-managed | ~1s | <1s (image cached) |
+| **File I/O** | Archive API | Native SDK | Via exec (base64) | Native SDK | Via exec (base64) | Native SDK | Native SDK | Via exec (stdin) |
+| **Regions** | Sandbank-managed | Multi | Multi | Global edge | Self-hosted | E2B managed | agent-next managed | Local or `DOCKER_HOST` |
+| **External deps** | `@sandbank.dev/cloud` + API token/x402 | `@daytonaio/sdk` | None (pure fetch) | `@cloudflare/sandbox` | BoxLite API | `e2b` | `e2b` | `docker` CLI |
 
 ## Multi-Agent Sessions
 

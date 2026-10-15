@@ -72,7 +72,9 @@ Sandbank Cloud は推奨デフォルト provider です。`SandbankCloudAdapter`
 | [`@sandbank.dev/flyio`](./packages/flyio) | Fly.io Machines アダプター |
 | [`@sandbank.dev/cloudflare`](./packages/cloudflare) | Cloudflare Workers アダプター |
 | [`@sandbank.dev/boxlite`](./packages/boxlite) | BoxLite セルフホスト Docker アダプター |
+| [`@sandbank.dev/docker`](./packages/docker) | ローカル Docker コンテナアダプター (CLI、SDK 依存なし) |
 | [`@sandbank.dev/e2b`](./packages/e2b) | E2B クラウドサンドボックスアダプター |
+| [`@sandbank.dev/sbx`](./packages/sbx) | agent-next sandbox (sbx) アダプター、E2B 互換クラウドサンドボックス |
 | [`@sandbank.dev/db9`](./packages/db9) | db9.ai serverless PostgreSQL アダプター (`ServiceProvider`) |
 | [`@sandbank.dev/relay`](./packages/relay) | マルチエージェント通信用 WebSocket リレー |
 | [`@sandbank.dev/agent`](./packages/agent) | サンドボックス内エージェント軽量クライアント |
@@ -83,28 +85,28 @@ Sandbank Cloud は推奨デフォルト provider です。`SandbankCloudAdapter`
 
 すべてのプロバイダーが実装する最小契約：
 
-| 操作 | Sandbank Cloud | Daytona | Fly.io | Cloudflare | BoxLite | E2B |
-|------|:--------------:|:-------:|:------:|:----------:|:-------:|:---:|
-| 作成 / 破棄 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| サンドボックス一覧 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| コマンド実行 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| ファイル読み書き | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| スキル注入 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| 操作 | Sandbank Cloud | Daytona | Fly.io | Cloudflare | BoxLite | E2B | sbx | Docker |
+|------|:--------------:|:-------:|:------:|:----------:|:-------:|:---:|:---:|:---:|
+| 作成 / 破棄 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| サンドボックス一覧 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| コマンド実行 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| ファイル読み書き | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| スキル注入 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 
 ### 拡張ケイパビリティ
 
 ケイパビリティはオプトインです。`withVolumes(provider)` や `withPortExpose(sandbox)` 等で実行時に安全に検出・アクセスできます。
 
-| ケイパビリティ | Sandbank Cloud | Daytona | Fly.io | Cloudflare | BoxLite | E2B | db9 | 説明 |
-|--------------|:--------------:|:-------:|:------:|:----------:|:-------:|:---:|:---:|------|
-| `volumes` | ❌ | ✅ | ✅ | ⚠️* | ❌ | ⚠️*** | — | 永続ボリューム管理 |
-| `port.expose` | ✅ | ✅ | ✅ | ⚠️** | ✅ | ✅ | — | サンドボックスポートをインターネットに公開 |
-| `exec.stream` | ✅ | ❌ | ❌ | ✅ | ✅ | ❌ | — | stdout/stderr のリアルタイムストリーミング |
-| `snapshot` | ❌ | ❌ | ❌ | ✅ | ✅ | ❌ | — | サンドボックス状態のスナップショットと復元 |
-| `terminal` | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | — | インタラクティブ Web ターミナル (ttyd) |
-| `sleep` | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ | — | サンドボックスの休止と復帰 |
-| `skills` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | スキル定義をサンドボックスにロード・注入 |
-| `services` | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | データサービス (PostgreSQL) をサンドボックスへバインド |
+| ケイパビリティ | Sandbank Cloud | Daytona | Fly.io | Cloudflare | BoxLite | E2B | sbx | Docker | db9 | 説明 |
+|--------------|:--------------:|:-------:|:------:|:----------:|:-------:|:---:|:---:|:---:|:---:|------|
+| `volumes` | ❌ | ✅ | ✅ | ⚠️* | ❌ | ⚠️*** | ❌ | ✅ | — | 永続ボリューム管理 |
+| `port.expose` | ✅ | ✅ | ✅ | ⚠️** | ✅ | ✅ | ✅ | ✅ | — | サンドボックスポートをインターネットに公開 |
+| `exec.stream` | ✅ | ❌ | ❌ | ✅ | ✅ | ❌ | ❌ | ✅ | — | stdout/stderr のリアルタイムストリーミング |
+| `snapshot` | ❌ | ❌ | ❌ | ✅ | ✅ | ❌ | ❌ | ❌ | — | サンドボックス状態のスナップショットと復元 |
+| `terminal` | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | — | インタラクティブ Web ターミナル (ttyd) |
+| `sleep` | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ | ✅ | ✅ | — | サンドボックスの休止と復帰 |
+| `skills` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | スキル定義をサンドボックスにロード・注入 |
+| `services` | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | データサービス (PostgreSQL) をサンドボックスへバインド |
 
 \* Cloudflare の `volumes` はアダプター設定で `storage` オプションが必要です。
 
@@ -114,14 +116,14 @@ Sandbank Cloud は推奨デフォルト provider です。`SandbankCloudAdapter`
 
 ### プロバイダー特性比較
 
-| | Sandbank Cloud | Daytona | Fly.io | Cloudflare | BoxLite | E2B |
-|---|----------------|---------|--------|------------|---------|-----|
-| **位置づけ** | 推奨デフォルト provider | Cloud sandbox | VM/microVM | Edge Worker | セルフホスト BoxLite | Cloud sandbox |
-| **ランタイム** | Hosted BoxLite containers | フル VM | Firecracker マイクロ VM | V8 アイソレート + コンテナ | Docker コンテナ | E2B クラウドサンドボックス |
-| **コールドスタート** | Managed-service optimized | ~10 秒 | ~3-5 秒 | ~1 秒 | ~2-5 秒 | Provider 管理 |
-| **ファイル I/O** | Archive API | ネイティブ SDK | exec 経由 (base64) | ネイティブ SDK | exec 経由 (base64) | ネイティブ SDK |
-| **リージョン** | Sandbank-managed | マルチ | マルチ | グローバルエッジ | セルフホスト | E2B 管理 |
-| **外部依存** | `@sandbank.dev/cloud` + API token/x402 | `@daytonaio/sdk` | なし (純粋 fetch) | `@cloudflare/sandbox` | BoxLite API | `e2b` |
+| | Sandbank Cloud | Daytona | Fly.io | Cloudflare | BoxLite | E2B | sbx | Docker |
+|---|----------------|---------|--------|------------|---------|-----|---|---|
+| **位置づけ** | 推奨デフォルト provider | Cloud sandbox | VM/microVM | Edge Worker | セルフホスト BoxLite | Cloud sandbox | agent-next クラウドサンドボックス | ローカル / セルフホスト |
+| **ランタイム** | Hosted BoxLite containers | フル VM | Firecracker マイクロ VM | V8 アイソレート + コンテナ | Docker コンテナ | E2B クラウドサンドボックス | E2B 互換クラウドサンドボックス (CPU/GPU) | Docker コンテナ |
+| **コールドスタート** | Managed-service optimized | ~10 秒 | ~3-5 秒 | ~1 秒 | ~2-5 秒 | Provider 管理 | ~1 秒 | <1 秒 (イメージキャッシュ済み) |
+| **ファイル I/O** | Archive API | ネイティブ SDK | exec 経由 (base64) | ネイティブ SDK | exec 経由 (base64) | ネイティブ SDK | ネイティブ SDK | exec 経由 (stdin) |
+| **リージョン** | Sandbank-managed | マルチ | マルチ | グローバルエッジ | セルフホスト | E2B 管理 | agent-next 管理 | ローカルまたは `DOCKER_HOST` |
+| **外部依存** | `@sandbank.dev/cloud` + API token/x402 | `@daytonaio/sdk` | なし (純粋 fetch) | `@cloudflare/sandbox` | BoxLite API | `e2b` | `e2b` | `docker` CLI |
 
 ## マルチエージェントセッション
 
