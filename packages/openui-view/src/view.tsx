@@ -21,6 +21,8 @@ function View() {
       } else if (m.method === 'ui/notifications/tool-input' || m.method === 'ui/notifications/tool-input-partial') {
         const s = str(m.params?.arguments?.openui)
         if (s !== null) { setSrc(s); setStreaming(true) }
+      } else if (!m.method && m.id === 1) {
+        window.parent.postMessage({ jsonrpc: '2.0', method: 'ui/notifications/initialized', params: {} }, '*')
       } else if (!m.method) {
         handleToolResponse(m)
       }
