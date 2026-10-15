@@ -16,9 +16,12 @@ function lazy(configured: boolean, make: () => SandboxProvider): ProviderEntry {
   return { configured, get: () => (provider ??= make()) }
 }
 
+/** Set and not an unexpanded `${VAR}` placeholder from a plugin config. */
+const isSet = (v?: string) => Boolean(v) && !v!.startsWith('${')
+
 export function defaultRegistry(env: NodeJS.ProcessEnv = process.env): ProviderRegistry {
   return {
     docker: lazy(true, () => createProvider(new DockerAdapter())),
-    sbx: lazy(Boolean(env.SBX_API_KEY || env.E2B_API_KEY), () => createProvider(new SbxAdapter())),
+    sbx: lazy(isSet(env.SBX_API_KEY) || isSet(env.E2B_API_KEY), () => createProvider(new SbxAdapter())),
   }
 }

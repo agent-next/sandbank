@@ -11,6 +11,7 @@ export const UI_URI = 'ui://sandbank/console-v1.html'
 export const UI_MIME = 'text/html;profile=mcp-app'
 const UI_CSP = { frameDomains: ['https://*.sbx.agent-next.com'] }
 const TEXT_LIMIT = 100_000
+const FILE_LIMIT = 1_000_000
 
 export interface SandboxRow {
   provider: string
@@ -59,9 +60,11 @@ export function createServer(options: CreateServerOptions = {}): McpServer {
   }
 
   const listRows = async (name?: string): Promise<SandboxRow[]> => {
-    const names = name ? [name] : Object.keys(registry).filter((n) => registry[n]!.configured)
-    const lists = await Promise.all(names.map(async (n) => (await resolve(n).list()).map((s) => row(n, s))))
-    return lists.flat()
+    if (name) return (await resolve(name).list()).map((s) => row(name, s))
+    // One unavailable provider (e.g. no docker daemon) must not hide the others.
+    const names = Object.keys(registry).filter((n) => registry[n]!.configured)
+    const lists = await Promise.allSettled(names.map(async (n) => (await resolve(n).list()).map((s) => row(n, s))))
+    return lists.flatMap((r) => (r.status === 'fulfilled' ? r.value : []))
   }
 
   // Wraps a handler so thrown errors become isError results.
@@ -119,13 +122,19 @@ export function createServer(options: CreateServerOptions = {}): McpServer {
       const sb = await resolve(p).get(sid)
       const t0 = Date.now()
       const r = await sb.exec(command, { cwd, timeout: timeoutMs })
-      const out = { id: sid, command, exitCode: r.exitCode, stdout: r.stdout, stderr: r.stderr, durationMs: Date.now() - t0 }
+      const out = {
+        id: sid, command, exitCode: r.exitCode,
+        stdout: r.stdout.slice(-TEXT_LIMIT), stderr: r.stderr.slice(-TEXT_LIMIT), durationMs: Date.now() - t0,
+      }
       return ok(`exit ${r.exitCode}\n${(r.stdout + r.stderr).slice(0, TEXT_LIMIT)}`, out)
     },
   )
 
   tool('file_read', 'Read a file from a sandbox', { provider, id, path: z.string() }, async ({ provider: p, id: sid, path }) => {
     const bytes = await (await resolve(p).get(sid)).readFile(path)
+    if (bytes.length > FILE_LIMIT) {
+      throw new Error(`${path} is ${bytes.length} bytes; file_read returns at most ${FILE_LIMIT}. Use sandbox_exec (head/tail/grep) instead.`)
+    }
     const buf = Buffer.from(bytes)
     let content: string
     let encoding: 'utf8' | 'base64' = 'utf8'

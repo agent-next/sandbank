@@ -1,8 +1,10 @@
+import { spawn } from 'node:child_process'
+import { request } from 'node:http'
 import { describe, expect, it } from 'vitest'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
 import type { Sandbox, SandboxInfo, SandboxProvider } from '@sandbank.dev/core'
-import { createServer, UI_MIME, UI_URI } from '../src/index.js'
+import { createServer, defaultRegistry, UI_MIME, UI_URI } from '../src/index.js'
 import type { ProviderRegistry } from '../src/index.js'
 
 function fakeProvider(): SandboxProvider {
@@ -127,5 +129,59 @@ describe('sandbank mcp server', () => {
     const { contents } = await c.readResource({ uri: UI_URI })
     expect(contents[0]).toMatchObject({ uri: UI_URI, mimeType: UI_MIME, text: '<html>console</html>' })
     expect((contents[0]!._meta as any).ui.csp.frameDomains).toEqual(['https://*.sbx.agent-next.com'])
+  })
+
+  it('keeps listing other providers when one is down', async () => {
+    const down = { ...fakeProvider(), list: async () => { throw new Error('docker daemon unreachable') } }
+    const c = await connect({ fake: registry.fake!, down: { configured: true, get: () => down } })
+    await call(c, 'sandbox_create', { provider: 'fake' })
+    const r = await call(c, 'sandbox_list', {})
+    expect(r.isError).toBeUndefined()
+    expect(r.structuredContent.sandboxes.map((s: any) => s.provider)).toContain('fake')
+    expect((await call(c, 'sandbox_list', { provider: 'down' })).isError).toBe(true)
+  })
+
+  it('refuses file_read over 1 MB', async () => {
+    const c = await connect(registry)
+    const id = (await call(c, 'sandbox_create', { provider: 'fake' })).structuredContent.sandbox.id
+    await call(c, 'file_write', { provider: 'fake', id, path: '/big', content: 'x'.repeat(1_000_001) })
+    const r = await call(c, 'file_read', { provider: 'fake', id, path: '/big' })
+    expect(r.isError).toBe(true)
+    expect(r.content[0]!.text).toMatch(/at most 1000000/)
+  })
+
+  it('treats an unexpanded ${SBX_API_KEY} placeholder as not configured', () => {
+    expect(defaultRegistry({ SBX_API_KEY: '${SBX_API_KEY}' }).sbx!.configured).toBe(false)
+    expect(defaultRegistry({ SBX_API_KEY: 'k' }).sbx!.configured).toBe(true)
+  })
+})
+
+describe('sandbank mcp --http', () => {
+  it('rejects foreign Host and Origin headers', async () => {
+    const port = 39000 + Math.floor(Math.random() * 1000)
+    const child = spawn('npx', ['tsx', 'packages/mcp/src/bin.ts', '--http', String(port)], { stdio: ['ignore', 'ignore', 'pipe'] })
+    try {
+      await new Promise<void>((resolve, reject) => {
+        child.stderr.on('data', (d: Buffer) => { if (d.toString().includes('listening')) resolve() })
+        child.on('exit', () => reject(new Error('server exited')))
+      })
+      const body = JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' })
+      const post = (headers: Record<string, string>) => fetch(`http://127.0.0.1:${port}/mcp`, {
+        method: 'POST', body,
+        headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream', ...headers },
+      })
+      expect((await post({})).status).toBe(200)
+      expect((await post({ origin: 'https://evil.example' })).status).toBe(403)
+      // fetch cannot override Host, so send this one with node:http.
+      const hostStatus = await new Promise<number>((resolve, reject) => {
+        const req = request({ host: '127.0.0.1', port, path: '/mcp', method: 'POST', headers: { host: `evil.example:${port}` } },
+          (res) => { res.resume(); resolve(res.statusCode ?? 0) })
+        req.on('error', reject)
+        req.end(body)
+      })
+      expect(hostStatus).toBe(403)
+    } finally {
+      child.kill()
+    }
   })
 })
