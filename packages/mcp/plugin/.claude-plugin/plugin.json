@@ -1,0 +1,11 @@
+{
+  "name": "sandbank",
+  "description": "Disposable sandboxes (local Docker or sbx cloud) with an inline console, via the Sandbank MCP server.",
+  "version": "0.0.1",
+  "author": {
+    "name": "agent-next",
+    "url": "https://agent-next.com"
+  },
+  "homepage": "https://github.com/agent-next/sandbank",
+  "keywords": ["sandbox", "code-execution", "mcp", "docker"]
+}
