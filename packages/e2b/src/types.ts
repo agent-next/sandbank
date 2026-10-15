@@ -5,6 +5,9 @@ export interface E2BAdapterConfig {
   /** E2B API domain. Defaults to the SDK default. */
   domain?: string
 
+  /** E2B API URL. Defaults to E2B_API_URL or `https://api.${domain}`. */
+  apiUrl?: string
+
   /** Request timeout in milliseconds for SDK API calls. */
   requestTimeoutMs?: number
 

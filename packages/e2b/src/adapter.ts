@@ -235,6 +235,7 @@ export class E2BAdapter implements SandboxAdapter {
     return {
       apiKey: this.config.apiKey,
       domain: this.config.domain,
+      apiUrl: this.config.apiUrl,
       requestTimeoutMs: requestTimeoutMs ?? this.config.requestTimeoutMs,
       debug: this.config.debug,
     }

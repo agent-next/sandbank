@@ -1,0 +1,45 @@
+{
+  "name": "@sandbank.dev/sbx",
+  "version": "0.1.0",
+  "description": "agent-next sandbox (sbx) adapter for Sandbank",
+  "license": "MIT",
+  "type": "module",
+  "homepage": "https://sandbank.dev",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/chekusu/sandbank.git",
+    "directory": "packages/sbx"
+  },
+  "keywords": [
+    "sandbox",
+    "ai-agent",
+    "sbx",
+    "agent-next",
+    "e2b",
+    "cloud"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@sandbank.dev/core": "workspace:*",
+    "@sandbank.dev/e2b": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.0",
+    "e2b": "^2.26.0",
+    "typescript": "^5.7.3",
+    "vitest": "^4.0.18"
+  }
+}

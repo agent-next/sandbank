@@ -72,7 +72,9 @@ Sandbank Cloud 是默认推荐 provider；把 `SandbankCloudAdapter` 换成 `Day
 | [`@sandbank.dev/flyio`](./packages/flyio) | Fly.io Machines 适配器 |
 | [`@sandbank.dev/cloudflare`](./packages/cloudflare) | Cloudflare Workers 适配器 |
 | [`@sandbank.dev/boxlite`](./packages/boxlite) | BoxLite 自托管 Docker 适配器 |
+| [`@sandbank.dev/docker`](./packages/docker) | 本地 Docker 容器适配器（CLI，无 SDK 依赖） |
 | [`@sandbank.dev/e2b`](./packages/e2b) | E2B 云沙箱适配器 |
+| [`@sandbank.dev/sbx`](./packages/sbx) | agent-next sandbox (sbx) 适配器，E2B 兼容云沙箱 |
 | [`@sandbank.dev/db9`](./packages/db9) | db9.ai serverless PostgreSQL 适配器 (`ServiceProvider`) |
 | [`@sandbank.dev/relay`](./packages/relay) | WebSocket 中继，用于多 Agent 通信 |
 | [`@sandbank.dev/agent`](./packages/agent) | 沙箱内 Agent 轻量客户端 |
@@ -83,28 +85,28 @@ Sandbank Cloud 是默认推荐 provider；把 `SandbankCloudAdapter` 换成 `Day
 
 所有 Provider 都必须实现的最小契约：
 
-| 操作 | Sandbank Cloud | Daytona | Fly.io | Cloudflare | BoxLite | E2B |
-|------|:--------------:|:-------:|:------:|:----------:|:-------:|:---:|
-| 创建 / 销毁 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| 列出沙箱 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| 执行命令 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| 读写文件 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Skill 注入 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| 操作 | Sandbank Cloud | Daytona | Fly.io | Cloudflare | BoxLite | E2B | sbx | Docker |
+|------|:--------------:|:-------:|:------:|:----------:|:-------:|:---:|:---:|:---:|
+| 创建 / 销毁 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| 列出沙箱 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| 执行命令 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| 读写文件 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Skill 注入 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 
 ### 扩展能力
 
 能力是可选的。通过 `withVolumes(provider)`、`withPortExpose(sandbox)` 等函数在运行时安全检测并访问。
 
-| 能力 | Sandbank Cloud | Daytona | Fly.io | Cloudflare | BoxLite | E2B | db9 | 说明 |
-|------|:--------------:|:-------:|:------:|:----------:|:-------:|:---:|:---:|------|
-| `volumes` | ❌ | ✅ | ✅ | ⚠️* | ❌ | ⚠️*** | — | 持久卷管理 |
-| `port.expose` | ✅ | ✅ | ✅ | ⚠️** | ✅ | ✅ | — | 将沙箱端口暴露到公网 |
-| `exec.stream` | ✅ | ❌ | ❌ | ✅ | ✅ | ❌ | — | 实时流式输出 stdout/stderr |
-| `snapshot` | ❌ | ❌ | ❌ | ✅ | ✅ | ❌ | — | 沙箱状态快照与恢复 |
-| `terminal` | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | — | 交互式 Web 终端 (ttyd) |
-| `sleep` | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ | — | 休眠与唤醒 |
-| `skills` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | 加载并注入 Skill 定义到沙箱 |
-| `services` | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | 将数据服务 (PostgreSQL) 绑定到沙箱 |
+| 能力 | Sandbank Cloud | Daytona | Fly.io | Cloudflare | BoxLite | E2B | sbx | Docker | db9 | 说明 |
+|------|:--------------:|:-------:|:------:|:----------:|:-------:|:---:|:---:|:---:|:---:|------|
+| `volumes` | ❌ | ✅ | ✅ | ⚠️* | ❌ | ⚠️*** | ❌ | ✅ | — | 持久卷管理 |
+| `port.expose` | ✅ | ✅ | ✅ | ⚠️** | ✅ | ✅ | ✅ | ✅ | — | 将沙箱端口暴露到公网 |
+| `exec.stream` | ✅ | ❌ | ❌ | ✅ | ✅ | ❌ | ❌ | ✅ | — | 实时流式输出 stdout/stderr |
+| `snapshot` | ❌ | ❌ | ❌ | ✅ | ✅ | ❌ | ❌ | ❌ | — | 沙箱状态快照与恢复 |
+| `terminal` | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | — | 交互式 Web 终端 (ttyd) |
+| `sleep` | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ | ✅ | ✅ | — | 休眠与唤醒 |
+| `skills` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | 加载并注入 Skill 定义到沙箱 |
+| `services` | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | 将数据服务 (PostgreSQL) 绑定到沙箱 |
 
 \* Cloudflare 的 `volumes` 需要在适配器配置中启用 `storage` 选项。
 
@@ -114,14 +116,14 @@ Sandbank Cloud 是默认推荐 provider；把 `SandbankCloudAdapter` 换成 `Day
 
 ### Provider 特性对比
 
-| | Sandbank Cloud | Daytona | Fly.io | Cloudflare | BoxLite | E2B |
-|---|----------------|---------|--------|------------|---------|-----|
-| **定位** | 推荐默认 provider | 云沙箱 | VM/microVM | 边缘 Worker | 自托管 BoxLite | 云沙箱 |
-| **运行时** | 托管 BoxLite 容器 | 完整 VM | Firecracker 微虚拟机 | V8 隔离 + 容器 | Docker 容器 | E2B 云沙箱 |
-| **冷启动** | 托管服务优化 | ~10s | ~3-5s | ~1s | ~2-5s | Provider 管理 |
-| **文件 I/O** | Archive API | 原生 SDK | 通过 exec (base64) | 原生 SDK | 通过 exec (base64) | 原生 SDK |
-| **区域** | Sandbank 管理 | 多区域 | 多区域 | 全球边缘 | 自托管 | E2B 管理 |
-| **外部依赖** | `@sandbank.dev/cloud` + API token/x402 | `@daytonaio/sdk` | 无 (纯 fetch) | `@cloudflare/sandbox` | BoxLite API | `e2b` |
+| | Sandbank Cloud | Daytona | Fly.io | Cloudflare | BoxLite | E2B | sbx | Docker |
+|---|----------------|---------|--------|------------|---------|-----|---|---|
+| **定位** | 推荐默认 provider | 云沙箱 | VM/microVM | 边缘 Worker | 自托管 BoxLite | 云沙箱 | agent-next 云沙箱 | 本地 / 自托管 |
+| **运行时** | 托管 BoxLite 容器 | 完整 VM | Firecracker 微虚拟机 | V8 隔离 + 容器 | Docker 容器 | E2B 云沙箱 | E2B 兼容云沙箱 (CPU/GPU) | Docker 容器 |
+| **冷启动** | 托管服务优化 | ~10s | ~3-5s | ~1s | ~2-5s | Provider 管理 | ~1s | <1s (镜像已缓存) |
+| **文件 I/O** | Archive API | 原生 SDK | 通过 exec (base64) | 原生 SDK | 通过 exec (base64) | 原生 SDK | 原生 SDK | 通过 exec (stdin) |
+| **区域** | Sandbank 管理 | 多区域 | 多区域 | 全球边缘 | 自托管 | E2B 管理 | agent-next 管理 | 本地或 `DOCKER_HOST` |
+| **外部依赖** | `@sandbank.dev/cloud` + API token/x402 | `@daytonaio/sdk` | 无 (纯 fetch) | `@cloudflare/sandbox` | BoxLite API | `e2b` | `e2b` | `docker` CLI |
 
 ## 多 Agent 会话
 

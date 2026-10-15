@@ -1,0 +1,42 @@
+{
+  "name": "@sandbank.dev/docker",
+  "version": "0.1.0",
+  "description": "Local Docker container adapter for Sandbank",
+  "license": "MIT",
+  "type": "module",
+  "homepage": "https://sandbank.dev",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/chekusu/sandbank.git",
+    "directory": "packages/docker"
+  },
+  "keywords": [
+    "sandbox",
+    "ai-agent",
+    "docker",
+    "container",
+    "local"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@sandbank.dev/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.0",
+    "typescript": "^5.7.3",
+    "vitest": "^4.0.18"
+  }
+}
