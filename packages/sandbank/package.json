@@ -1,6 +1,6 @@
 {
   "name": "sandbank",
-  "version": "0.5.4",
+  "version": "0.5.5",
   "description": "Workspace Agent Harness and sandbox orchestration CLI for AI agents",
   "license": "MIT",
   "type": "module",

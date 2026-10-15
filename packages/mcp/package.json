@@ -1,6 +1,6 @@
 {
   "name": "@sandbank.dev/mcp",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "MCP server (with MCP Apps console UI) for Sandbank sandboxes",
   "license": "MIT",
   "type": "module",

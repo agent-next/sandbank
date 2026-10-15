@@ -4,7 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-10-15
+
 ### Added
+- `@sandbank.dev/mcp` — MCP server (`sandbank-mcp` bin) exposing sandbox tools plus an MCP Apps console UI (`render_console`), with a bundled skill/plugin
+- OpenUI `render_view` generative view in `@sandbank.dev/mcp` (component catalog bundled via `@sandbank.dev/openui-view`, now published)
 - `@sandbank.dev/sbx` — agent-next sandbox (sbx) adapter: E2B-compatible cloud sandbox with sbx endpoints, `SBX_API_KEY`, and kill-on-timeout defaults
 - `@sandbank.dev/docker` — local Docker container adapter over the `docker` CLI: exec/stream, files, pause/unpause, published ports, named volumes, `--rm` auto-destroy
 - `E2BAdapterConfig.apiUrl` so E2B-compatible endpoints are not overridden by a global `E2B_API_URL`
