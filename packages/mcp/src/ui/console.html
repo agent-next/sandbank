@@ -1,0 +1,503 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Sandbank Console</title>
+<style>
+:root{--bg:#fff;--fg:#1b1f24;--mut:#667085;--card:#f6f7f9;--bd:#d8dce2;--acc:#2563eb;--accfg:#fff;--ok:#15803d;--warn:#b45309;--err:#b91c1c;--term:#0f1419;--termfg:#d6dde6;--tout:#d6dde6;--terr:#ff8a80;--sel:#e8f0fe}
+@media (prefers-color-scheme:dark){:root{--bg:#14171c;--fg:#e6e9ee;--mut:#98a2b3;--card:#1c2027;--bd:#2f3541;--acc:#5b8def;--accfg:#0b1020;--ok:#4ade80;--warn:#fbbf24;--err:#f87171;--term:#0a0d11;--sel:#1e2a44}}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--fg);font:13px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
+button,input,select{font:inherit;color:inherit}
+header{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--bd)}
+header h1{font-size:14px;margin:0;flex:1}
+button{background:var(--card);border:1px solid var(--bd);border-radius:6px;padding:5px 10px;cursor:pointer}
+button:hover:not(:disabled){border-color:var(--acc)}
+button.primary{background:var(--acc);color:var(--accfg);border-color:var(--acc)}
+button.danger{color:var(--err);border-color:var(--err)}
+button.danger.armed{background:var(--err);color:#fff}
+button:disabled{opacity:.5;cursor:not-allowed}
+input,select{background:var(--bg);border:1px solid var(--bd);border-radius:6px;padding:5px 8px;min-width:0}
+input:focus,select:focus,button:focus-visible{outline:2px solid var(--acc);outline-offset:1px}
+#banner{padding:6px 12px;font-size:12px;display:none}
+#banner.show{display:block}
+#banner.err{background:var(--err);color:#fff}
+#banner.info{background:var(--card);color:var(--mut)}
+main{display:grid;grid-template-columns:minmax(220px,2fr) 3fr;min-height:320px}
+@media (max-width:640px){main{grid-template-columns:1fr}}
+#list{border-right:1px solid var(--bd);overflow:auto;max-height:520px}
+#detail{padding:12px;overflow:auto;min-width:0}
+.row{display:block;width:100%;text-align:left;border:0;border-bottom:1px solid var(--bd);border-radius:0;background:transparent;padding:8px 12px}
+.row.sel{background:var(--sel)}
+.row .l1{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.row .id{font-family:ui-monospace,Menlo,monospace;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
+.row .l2{color:var(--mut);font-size:12px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.badge,.pill{display:inline-block;border-radius:999px;padding:0 8px;font-size:11px;line-height:18px;border:1px solid var(--bd);background:var(--card)}
+.pill.running{color:var(--ok);border-color:var(--ok)}
+.pill.starting,.pill.creating,.pill.pending{color:var(--warn);border-color:var(--warn)}
+.pill.error,.pill.failed{color:var(--err);border-color:var(--err)}
+.empty{padding:20px 12px;color:var(--mut)}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:10px;margin-bottom:10px}
+.card h2{font-size:12px;margin:0 0 8px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em}
+.bar{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.bar input{flex:1;min-width:120px}
+.mono{font-family:ui-monospace,Menlo,monospace}
+pre.term{margin:8px 0 0;padding:8px;background:var(--term);color:var(--termfg);border-radius:6px;max-height:260px;overflow:auto;white-space:pre-wrap;word-break:break-all;font:12px/1.4 ui-monospace,Menlo,monospace}
+pre.term .o{color:var(--tout)}
+pre.term .e{color:var(--terr)}
+.meta{color:var(--mut);font-size:12px;margin-top:6px}
+.meta .bad{color:var(--err)}
+.meta .good{color:var(--ok)}
+a{color:var(--acc)}
+iframe.preview{width:100%;height:280px;border:1px solid var(--bd);border-radius:6px;margin-top:8px;background:#fff}
+form.new{display:none;padding:10px 12px;border-bottom:1px solid var(--bd);gap:6px;flex-wrap:wrap;align-items:center}
+form.new.show{display:flex}
+.spin{display:none;width:12px;height:12px;border:2px solid var(--bd);border-top-color:var(--acc);border-radius:50%;animation:s .8s linear infinite}
+body.busy .spin{display:inline-block}
+@keyframes s{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title">Sandbank</h1>
+  <span class="spin" id="spin" aria-hidden="true"></span>
+  <button id="btnNew" type="button"></button>
+  <button id="btnRefresh" type="button"></button>
+</header>
+<form class="new" id="newForm">
+  <select id="newProvider" aria-label="provider"></select>
+  <input id="newImage" aria-label="image" autocomplete="off" spellcheck="false">
+  <button class="primary" id="btnCreate" type="submit"></button>
+</form>
+<div id="banner" role="status"></div>
+<main>
+  <section id="list" aria-label="sandboxes"></section>
+  <section id="detail"></section>
+</main>
+<script>
+(function () {
+  'use strict';
+
+  var STR = {
+    en: {
+      title: 'Sandbank sandboxes', refresh: 'Refresh', newSb: 'New sandbox', create: 'Create',
+      image: 'image (optional)', none: 'No sandboxes.', pick: 'Select a sandbox to inspect it.',
+      run: 'Run', command: 'command, e.g. uname -a', exec: 'Execute', output: 'Output',
+      exit: 'exit', ms: 'ms', expose: 'Expose port', port: 'port', open: 'Open link',
+      preview: 'Preview inline', closePreview: 'Close preview', destroy: 'Destroy',
+      confirmDestroy: 'Click again to confirm', cancel: 'Cancel', ask: 'Ask about this output',
+      sent: 'Sent to the conversation.', working: 'Working...', connecting: 'Connecting to host...',
+      created: 'Sandbox created.', destroyed: 'Sandbox destroyed.', age: 'ago', unknown: 'unknown',
+      noProviders: 'No providers reported.', notConfigured: ' (not configured)',
+      timeout: 'Host did not answer in time.', badPort: 'Enter a port 1-65535.', stdout: 'stdout', stderr: 'stderr',
+      noOutput: '(no output)'
+    },
+    zh: {
+      title: 'Sandbank 沙箱', refresh: '刷新', newSb: '新建沙箱', create: '创建',
+      image: '镜像（可选）', none: '暂无沙箱。', pick: '选择一个沙箱查看详情。',
+      run: '运行', command: '命令，例如 uname -a', exec: '执行', output: '输出',
+      exit: '退出码', ms: '毫秒', expose: '暴露端口', port: '端口', open: '打开链接',
+      preview: '内嵌预览', closePreview: '关闭预览', destroy: '销毁',
+      confirmDestroy: '再点一次确认', cancel: '取消', ask: '就此输出提问',
+      sent: '已发送到对话。', working: '处理中...', connecting: '正在连接宿主...',
+      created: '沙箱已创建。', destroyed: '沙箱已销毁。', age: '前', unknown: '未知',
+      noProviders: '未返回任何 provider。', notConfigured: '（未配置）',
+      timeout: '宿主未及时响应。', badPort: '请输入 1-65535 的端口。', stdout: '标准输出', stderr: '标准错误',
+      noOutput: '（无输出）'
+    }
+  };
+  var lang = String(document.documentElement.lang || '').toLowerCase().indexOf('zh') === 0 ? 'zh' : 'en';
+  function t(k) { return (STR[lang] && STR[lang][k]) || STR.en[k] || k; }
+
+  var PREVIEW_RE = /^https:\/\/[a-z0-9-]+(\.[a-z0-9-]+)*\.sbx\.agent-next\.com(\/|$)/i;
+  var CALL_TIMEOUT_MS = 180000;
+
+  var $ = function (id) { return document.getElementById(id); };
+  var state = {
+    sandboxes: [], providers: [], sel: null, focusId: null, busy: 0,
+    exec: {}, exposed: {}, preview: null, confirmKey: null, notice: null, error: null
+  };
+
+  function h(tag, props, kids) {
+    var el = document.createElement(tag);
+    if (props) for (var k in props) {
+      if (k === 'class') el.className = props[k];
+      else if (k === 'text') el.textContent = props[k];
+      else if (k === 'on') for (var ev in props.on) el.addEventListener(ev, props.on[ev]);
+      else if (props[k] === true) el.setAttribute(k, '');
+      else if (props[k] !== false && props[k] != null) el.setAttribute(k, String(props[k]));
+    }
+    (kids || []).forEach(function (c) { if (c != null) el.appendChild(typeof c === 'string' ? document.createTextNode(c) : c); });
+    return el;
+  }
+  function clear(el) { while (el.firstChild) el.removeChild(el.firstChild); }
+  function key(s) { return s.provider + '/' + s.id; }
+  function isObj(v) { return v && typeof v === 'object' && !Array.isArray(v); }
+
+  /* ---------- MCP Apps bridge (JSON-RPC 2.0 over postMessage) ---------- */
+  var nextId = 1, pending = {}, connected = false;
+
+  function post(msg) {
+    msg.jsonrpc = '2.0';
+    window.parent.postMessage(msg, '*');
+  }
+  function request(method, params, timeoutMs) {
+    return new Promise(function (resolve, reject) {
+      var id = nextId++;
+      var timer = setTimeout(function () {
+        delete pending[id];
+        reject(new Error(t('timeout')));
+      }, timeoutMs || CALL_TIMEOUT_MS);
+      pending[id] = { resolve: resolve, reject: reject, timer: timer };
+      post({ id: id, method: method, params: params || {} });
+    });
+  }
+  function notify(method, params) { post({ method: method, params: params || {} }); }
+
+  function errText(r) {
+    var c = r && r.content;
+    if (Array.isArray(c) && c[0] && typeof c[0].text === 'string') return c[0].text;
+    return 'tool error';
+  }
+  function callTool(name, args) {
+    return request('tools/call', { name: name, arguments: args || {} }).then(function (r) {
+      if (!isObj(r)) throw new Error('empty result');
+      if (r.isError) throw new Error(errText(r));
+      return isObj(r.structuredContent) ? r.structuredContent : {};
+    });
+  }
+
+  window.addEventListener('message', function (ev) {
+    if (ev.source !== window.parent) return;
+    var m = ev.data;
+    if (!isObj(m) || m.jsonrpc !== '2.0') return;
+    if (m.method === undefined && m.id != null && pending[m.id]) {
+      var p = pending[m.id];
+      delete pending[m.id];
+      clearTimeout(p.timer);
+      if (m.error) p.reject(new Error(String(m.error.message || 'rpc error')));
+      else p.resolve(m.result);
+      return;
+    }
+    if (m.method === 'ui/notifications/tool-result') {
+      var res = isObj(m.params) ? m.params : {};
+      if (res.isError) setError(errText(res));
+      else applyResult(res.structuredContent);
+    } else if (m.method === 'ui/notifications/tool-input') {
+      var a = isObj(m.params) && isObj(m.params.arguments) ? m.params.arguments : {};
+      if (typeof a.focusId === 'string') state.focusId = a.focusId;
+      setNotice(t('working'));
+    } else if (m.method === 'ui/notifications/host-context-changed') {
+      applyHostContext(m.params);
+    } else if (m.method === 'ui/resource-teardown' && m.id != null) {
+      post({ id: m.id, result: {} });
+    } else if (m.method === 'ping' && m.id != null) {
+      post({ id: m.id, result: {} });
+    }
+  });
+
+  function applyHostContext(ctx) {
+    if (!isObj(ctx)) return;
+    if (ctx.theme === 'dark' || ctx.theme === 'light') document.documentElement.style.colorScheme = ctx.theme;
+    if (typeof ctx.locale === 'string' && ctx.locale) { /* language follows documentElement.lang */ }
+  }
+
+  /* ---------- data handling (all values treated as untrusted) ---------- */
+  function cleanRow(r) {
+    if (!isObj(r) || typeof r.id !== 'string' || typeof r.provider !== 'string') return null;
+    return {
+      provider: r.provider, id: r.id,
+      state: typeof r.state === 'string' ? r.state : '',
+      createdAt: typeof r.createdAt === 'string' || typeof r.createdAt === 'number' ? r.createdAt : null,
+      image: typeof r.image === 'string' ? r.image : ''
+    };
+  }
+  function applyResult(sc) {
+    if (!isObj(sc)) return;
+    if (Array.isArray(sc.sandboxes)) {
+      state.sandboxes = sc.sandboxes.map(cleanRow).filter(Boolean);
+      if (typeof sc.focusId === 'string') state.focusId = sc.focusId;
+      var cur = state.sel;
+      var found = cur && state.sandboxes.filter(function (s) { return key(s) === cur; })[0];
+      if (!found) {
+        state.sel = null;
+        var f = state.focusId && state.sandboxes.filter(function (s) { return s.id === state.focusId; })[0];
+        if (f) select(f, true);
+      }
+      state.error = null; state.notice = null;
+    }
+    if (Array.isArray(sc.providers)) state.providers = sc.providers.filter(function (p) { return isObj(p) && typeof p.name === 'string'; });
+    render();
+  }
+
+  function ageOf(v) {
+    var ts = typeof v === 'number' ? (v < 1e12 ? v * 1000 : v) : Date.parse(v);
+    if (!isFinite(ts)) return t('unknown');
+    var s = Math.max(0, Math.round((Date.now() - ts) / 1000));
+    if (s < 60) return s + 's ' + t('age');
+    if (s < 3600) return Math.floor(s / 60) + 'm ' + t('age');
+    if (s < 86400) return Math.floor(s / 3600) + 'h ' + t('age');
+    return Math.floor(s / 86400) + 'd ' + t('age');
+  }
+  function selected() {
+    return state.sandboxes.filter(function (s) { return key(s) === state.sel; })[0] || null;
+  }
+
+  /* ---------- actions ---------- */
+  function setError(msg) { state.error = msg; state.notice = null; renderBanner(); }
+  function setNotice(msg) { state.notice = msg; state.error = null; renderBanner(); }
+
+  function run(label, fn) {
+    state.busy++; state.error = null;
+    render();
+    return fn().then(function (v) { state.busy--; render(); return v; }, function (e) {
+      state.busy--; state.error = (e && e.message) || String(e); state.notice = null; render();
+    });
+  }
+
+  function refresh() {
+    return run('refresh', function () {
+      return callTool('sandbox_list', {}).then(function (sc) { applyResult(sc); });
+    });
+  }
+  function loadProviders() {
+    return callTool('providers_list', {}).then(function (sc) { applyResult(sc); }, function () { /* shown by empty select */ });
+  }
+  function select(row, silent) {
+    state.sel = key(row);
+    state.preview = null; state.confirmKey = null;
+    notify('ui/update-model-context', {
+      content: [{ type: 'text', text: 'Selected sandbox ' + row.id + ' (' + row.provider + ', state ' + row.state + ', image ' + row.image + ')' }],
+      structuredContent: { selectedSandbox: row }
+    });
+    if (!silent) render();
+  }
+  function execCmd(row, cmd) {
+    if (!cmd.trim()) return;
+    var k = key(row);
+    return run('exec', function () {
+      return callTool('sandbox_exec', { provider: row.provider, id: row.id, command: cmd }).then(function (sc) {
+        state.exec[k] = {
+          command: cmd,
+          exitCode: typeof sc.exitCode === 'number' ? sc.exitCode : null,
+          stdout: typeof sc.stdout === 'string' ? sc.stdout : '',
+          stderr: typeof sc.stderr === 'string' ? sc.stderr : '',
+          durationMs: typeof sc.durationMs === 'number' ? sc.durationMs : null
+        };
+      });
+    });
+  }
+  function exposePort(row, portStr) {
+    var port = parseInt(portStr, 10);
+    if (!(port >= 1 && port <= 65535)) { setError(t('badPort')); return; }
+    var k = key(row);
+    return run('expose', function () {
+      return callTool('port_expose', { provider: row.provider, id: row.id, port: port }).then(function (sc) {
+        if (typeof sc.url === 'string') { state.exposed[k] = { port: port, url: sc.url }; state.preview = null; }
+      });
+    });
+  }
+  function destroy(row) {
+    var k = key(row);
+    if (state.confirmKey !== k) { state.confirmKey = k; render(); return; }
+    state.confirmKey = null;
+    return run('destroy', function () {
+      return callTool('sandbox_destroy', { provider: row.provider, id: row.id }).then(function () {
+        state.sandboxes = state.sandboxes.filter(function (s) { return key(s) !== k; });
+        delete state.exec[k]; delete state.exposed[k];
+        state.sel = null; state.notice = t('destroyed');
+      });
+    });
+  }
+  function createSb() {
+    var provider = $('newProvider').value;
+    if (!provider) return;
+    var args = { provider: provider };
+    var img = $('newImage').value.trim();
+    if (img) args.image = img;
+    return run('create', function () {
+      return callTool('sandbox_create', args).then(function (sc) {
+        $('newForm').classList.remove('show');
+        state.notice = t('created');
+        var row = cleanRow(sc.sandbox);
+        if (row) { state.sandboxes.push(row); select(row, true); }
+        return callTool('sandbox_list', {}).then(applyResult, function () {});
+      });
+    });
+  }
+  function askAbout(row) {
+    var e = state.exec[key(row)];
+    if (!e) return;
+    var out = (e.stdout + (e.stderr ? '\n[stderr]\n' + e.stderr : '')).slice(0, 2000);
+    var text = 'Sandbox ' + row.id + ' (' + row.provider + ') command: ' + e.command + '\nexit code: ' + e.exitCode +
+      '\noutput' + (out.length < (e.stdout.length + e.stderr.length) ? ' (truncated)' : '') + ':\n' + out;
+    return run('ask', function () {
+      return request('ui/message', { role: 'user', content: [{ type: 'text', text: text }] }).then(function () { state.notice = t('sent'); });
+    });
+  }
+
+  /* ---------- rendering ---------- */
+  function renderBanner() {
+    var b = $('banner');
+    var msg = state.error || state.notice || (connected ? '' : t('connecting'));
+    b.textContent = msg;
+    b.className = msg ? 'show ' + (state.error ? 'err' : 'info') : '';
+  }
+
+  function renderList() {
+    var box = $('list');
+    clear(box);
+    if (!state.sandboxes.length) { box.appendChild(h('div', { class: 'empty', text: t('none') })); return; }
+    state.sandboxes.forEach(function (s) {
+      var k = key(s);
+      box.appendChild(h('button', {
+        class: 'row' + (k === state.sel ? ' sel' : ''), type: 'button', 'aria-pressed': k === state.sel,
+        on: { click: function () { select(s); } }
+      }, [
+        h('div', { class: 'l1' }, [
+          h('span', { class: 'badge', text: s.provider }),
+          h('span', { class: 'pill ' + s.state.toLowerCase().replace(/[^a-z]/g, ''), text: s.state || t('unknown') }),
+          h('span', { class: 'id mono', text: s.id })
+        ]),
+        h('div', { class: 'l2', text: (s.image || '-') + ' · ' + ageOf(s.createdAt) })
+      ]));
+    });
+  }
+
+  function renderTerm(e) {
+    var pre = h('pre', { class: 'term' });
+    if (e.stdout) pre.appendChild(h('span', { class: 'o', text: e.stdout }));
+    if (e.stderr) pre.appendChild(h('span', { class: 'e', text: (e.stdout && !/\n$/.test(e.stdout) ? '\n' : '') + e.stderr }));
+    if (!e.stdout && !e.stderr) pre.appendChild(h('span', { class: 'o', text: t('noOutput') }));
+    return pre;
+  }
+
+  function renderDetail() {
+    var box = $('detail');
+    var row = selected();
+    var dis = state.busy > 0;
+    clear(box);
+    if (!row) { box.appendChild(h('div', { class: 'empty', text: t('pick') })); return; }
+    var k = key(row);
+
+    box.appendChild(h('div', { class: 'card' }, [
+      h('div', { class: 'bar' }, [
+        h('span', { class: 'badge', text: row.provider }),
+        h('span', { class: 'pill ' + row.state.toLowerCase().replace(/[^a-z]/g, ''), text: row.state || t('unknown') }),
+        h('strong', { class: 'mono', text: row.id })
+      ]),
+      h('div', { class: 'meta', text: (row.image || '-') + ' · ' + ageOf(row.createdAt) })
+    ]));
+
+    var cmd = h('input', { class: 'mono', 'aria-label': t('exec'), placeholder: t('command'), autocomplete: 'off', spellcheck: 'false', disabled: dis });
+    var cmdForm = h('form', { class: 'bar', on: { submit: function (ev) { ev.preventDefault(); execCmd(row, cmd.value); } } }, [
+      cmd, h('button', { class: 'primary', type: 'submit', text: t('run'), disabled: dis })
+    ]);
+    var execCard = h('div', { class: 'card' }, [h('h2', { text: t('exec') }), cmdForm]);
+    var e = state.exec[k];
+    if (e) {
+      execCard.appendChild(renderTerm(e));
+      var ok = e.exitCode === 0;
+      execCard.appendChild(h('div', { class: 'meta' }, [
+        h('span', { class: ok ? 'good' : 'bad', text: t('exit') + ' ' + (e.exitCode == null ? '?' : e.exitCode) }),
+        e.durationMs == null ? null : ' · ' + e.durationMs + ' ' + t('ms')
+      ]));
+      execCard.appendChild(h('div', { class: 'bar', style: 'margin-top:6px' }, [
+        h('button', { type: 'button', text: t('ask'), disabled: dis, on: { click: function () { askAbout(row); } } })
+      ]));
+    }
+    box.appendChild(execCard);
+
+    var port = h('input', { type: 'number', min: 1, max: 65535, 'aria-label': t('port'), placeholder: t('port'), disabled: dis, style: 'max-width:110px' });
+    var exCard = h('div', { class: 'card' }, [
+      h('h2', { text: t('expose') }),
+      h('form', { class: 'bar', on: { submit: function (ev) { ev.preventDefault(); exposePort(row, port.value); } } }, [
+        port, h('button', { type: 'submit', text: t('expose'), disabled: dis })
+      ])
+    ]);
+    var ex = state.exposed[k];
+    if (ex) {
+      var safeHttp = /^https?:\/\//i.test(ex.url);
+      var line = h('div', { class: 'bar', style: 'margin-top:8px' }, [
+        safeHttp ? h('a', { href: ex.url, target: '_blank', rel: 'noopener noreferrer', text: ex.url }) : h('span', { class: 'mono', text: ex.url })
+      ]);
+      if (PREVIEW_RE.test(ex.url)) {
+        line.appendChild(h('button', {
+          type: 'button', text: state.preview === ex.url ? t('closePreview') : t('preview'),
+          on: { click: function () { state.preview = state.preview === ex.url ? null : ex.url; render(); } }
+        }));
+      }
+      exCard.appendChild(line);
+      if (state.preview === ex.url && PREVIEW_RE.test(ex.url)) {
+        exCard.appendChild(h('iframe', { class: 'preview', src: ex.url, title: 'preview', referrerpolicy: 'no-referrer', sandbox: 'allow-scripts allow-forms allow-same-origin allow-popups' }));
+      }
+    }
+    box.appendChild(exCard);
+
+    var armed = state.confirmKey === k;
+    var dBar = [h('button', {
+      type: 'button', class: 'danger' + (armed ? ' armed' : ''), text: armed ? t('confirmDestroy') : t('destroy'),
+      disabled: dis, on: { click: function () { destroy(row); } }
+    })];
+    if (armed) dBar.push(h('button', { type: 'button', text: t('cancel'), on: { click: function () { state.confirmKey = null; render(); } } }));
+    box.appendChild(h('div', { class: 'bar' }, dBar));
+  }
+
+  function renderNewForm() {
+    var sel = $('newProvider');
+    var prev = sel.value;
+    clear(sel);
+    state.providers.forEach(function (p) {
+      var o = h('option', { value: p.name, text: p.name + (p.configured === false ? t('notConfigured') : '') });
+      if (p.configured === false) o.disabled = true;
+      sel.appendChild(o);
+    });
+    if (!state.providers.length) sel.appendChild(h('option', { value: '', text: t('noProviders') }));
+    else if (prev) sel.value = prev;
+    $('btnCreate').disabled = state.busy > 0 || !sel.value;
+    sel.disabled = state.busy > 0;
+  }
+
+  function render() {
+    document.body.classList.toggle('busy', state.busy > 0);
+    $('btnRefresh').disabled = state.busy > 0;
+    $('btnNew').disabled = state.busy > 0;
+    renderBanner();
+    renderList();
+    renderNewForm();
+    var active = document.activeElement;
+    var typing = active && active.closest && active.closest('#detail') && active.tagName === 'INPUT' && state.busy === 0;
+    if (!typing) renderDetail();
+  }
+
+  /* ---------- boot ---------- */
+  $('title').textContent = t('title');
+  $('btnNew').textContent = t('newSb');
+  $('btnRefresh').textContent = t('refresh');
+  $('btnCreate').textContent = t('create');
+  $('newImage').placeholder = t('image');
+  $('btnRefresh').addEventListener('click', refresh);
+  $('btnNew').addEventListener('click', function () { $('newForm').classList.toggle('show'); });
+  $('newForm').addEventListener('submit', function (ev) { ev.preventDefault(); createSb(); });
+  render();
+
+  request('ui/initialize', {
+    protocolVersion: '2026-01-26',
+    appInfo: { name: 'sandbank-console', version: '1.0.0' },
+    appCapabilities: {}
+  }, 15000).then(function (r) {
+    connected = true;
+    if (isObj(r)) applyHostContext(r.hostContext);
+    notify('ui/notifications/initialized', {});
+    renderBanner();
+    loadProviders();
+  }, function () {
+    connected = true;
+    renderBanner();
+  });
+})();
+</script>
+</body>
+</html>
