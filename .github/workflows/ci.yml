@@ -24,6 +24,8 @@ jobs:
       - run: pnpm --filter @sandbank.dev/cloudflare build
       - run: pnpm --filter @sandbank.dev/db9 build
       - run: pnpm --filter @sandbank.dev/e2b build
+      - run: pnpm --filter @sandbank.dev/docker build
+      - run: pnpm --filter @sandbank.dev/sbx build
       - run: pnpm typecheck
 
   test:

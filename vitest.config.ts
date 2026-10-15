@@ -15,6 +15,7 @@ export default defineConfig({
       '@sandbank.dev/docker': resolve(__dirname, 'packages/docker/src/index.ts'),
       '@sandbank.dev/e2b': resolve(__dirname, 'packages/e2b/src/index.ts'),
       '@sandbank.dev/sbx': resolve(__dirname, 'packages/sbx/src/index.ts'),
+      '@sandbank.dev/mcp': resolve(__dirname, 'packages/mcp/src/index.ts'),
       '@sandbank.dev/workspace': resolve(__dirname, 'packages/workspace/src/index.ts'),
       'cloudflare:workers': resolve(__dirname, 'test/stubs/cloudflare-workers.ts'),
     },
