@@ -23,6 +23,7 @@ jobs:
       - run: pnpm --filter @sandbank.dev/cloud build
       - run: pnpm --filter @sandbank.dev/cloudflare build
       - run: pnpm --filter @sandbank.dev/db9 build
+      - run: pnpm --filter @sandbank.dev/e2b build
       - run: pnpm typecheck
 
   test:
@@ -37,3 +38,5 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm test
+        env:
+          DOCKER_INTEGRATION: '1'
