@@ -1,6 +1,6 @@
 {
   "name": "@sandbank.dev/cloud",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Sandbank Cloud hosted BoxLite provider adapter with x402 payment support",
   "license": "MIT",
   "type": "module",

@@ -1,6 +1,6 @@
 {
   "name": "@sandbank.dev/e2b",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "E2B cloud sandbox adapter for Sandbank",
   "license": "MIT",
   "type": "module",

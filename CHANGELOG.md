@@ -4,7 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-10-15
+
 ### Added
+- `@sandbank.dev/mcp` — MCP server (`sandbank-mcp` bin) exposing sandbox tools plus an MCP Apps console UI (`render_console`), with a bundled skill/plugin
+- Hosted mode for `@sandbank.dev/mcp` (`SANDBANK_MCP_TOKEN` secret path, `SANDBANK_MCP_PROVIDERS` filter) for Claude/ChatGPT custom connectors
+- OpenUI `render_view` generative view in `@sandbank.dev/mcp` (component catalog bundled via `@sandbank.dev/openui-view`, now published)
 - `@sandbank.dev/sbx` — agent-next sandbox (sbx) adapter: E2B-compatible cloud sandbox with sbx endpoints, `SBX_API_KEY`, and kill-on-timeout defaults
 - `@sandbank.dev/docker` — local Docker container adapter over the `docker` CLI: exec/stream, files, pause/unpause, published ports, named volumes, `--rm` auto-destroy
 - `E2BAdapterConfig.apiUrl` so E2B-compatible endpoints are not overridden by a global `E2B_API_URL`
@@ -13,6 +18,8 @@ All notable changes to this project will be documented in this file.
 - Vitest resolve aliases for cross-package imports without build step
 
 ### Fixed
+- `@sandbank.dev/mcp` HTTP endpoint answers CORS for browser-based MCP hosts (any origin when hosted, local origins only in local mode)
+- OpenUI view sends `ui/notifications/initialized`, so MCP Apps hosts deliver the tool result; BarChart width capped
 - `uploadArchive`/`downloadArchive` error messages now correctly identify the unsupported operation instead of misleading `'snapshot'`
 - Daytona integration tests now properly skip when `DAYTONA_API_KEY` is not set
 - `@sandbank.dev/relay` package resolution failure in tests (missing `dist/` directory)

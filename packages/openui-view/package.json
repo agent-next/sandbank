@@ -1,10 +1,12 @@
 {
   "name": "@sandbank.dev/openui-view",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "OpenUI Lang generative view (component catalog + MCP Apps bundle) for the Sandbank MCP server",
   "license": "MIT",
-  "private": true,
   "type": "module",
+  "files": [
+    "dist"
+  ],
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",

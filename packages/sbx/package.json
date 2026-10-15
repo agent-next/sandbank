@@ -1,6 +1,6 @@
 {
   "name": "@sandbank.dev/sbx",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "agent-next sandbox (sbx) adapter for Sandbank",
   "license": "MIT",
   "type": "module",
