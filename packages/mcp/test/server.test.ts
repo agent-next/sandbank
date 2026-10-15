@@ -1,10 +1,10 @@
-import { spawn } from 'node:child_process'
 import { request } from 'node:http'
 import { describe, expect, it } from 'vitest'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
 import type { Sandbox, SandboxInfo, SandboxProvider } from '@sandbank.dev/core'
 import { createServer, defaultRegistry, UI_MIME, UI_URI } from '../src/index.js'
+import { startHttp } from '../src/http.js'
 import type { ProviderRegistry } from '../src/index.js'
 
 function fakeProvider(): SandboxProvider {
@@ -159,12 +159,8 @@ describe('sandbank mcp server', () => {
 describe('sandbank mcp --http', () => {
   it('rejects foreign Host and Origin headers', async () => {
     const port = 39000 + Math.floor(Math.random() * 1000)
-    const child = spawn('npx', ['tsx', 'packages/mcp/src/bin.ts', '--http', String(port)], { stdio: ['ignore', 'ignore', 'pipe'] })
+    const http = await startHttp(port, { registry: {}, html: '' })
     try {
-      await new Promise<void>((resolve, reject) => {
-        child.stderr.on('data', (d: Buffer) => { if (d.toString().includes('listening')) resolve() })
-        child.on('exit', () => reject(new Error('server exited')))
-      })
       const body = JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' })
       const post = (headers: Record<string, string>) => fetch(`http://127.0.0.1:${port}/mcp`, {
         method: 'POST', body,
@@ -181,7 +177,7 @@ describe('sandbank mcp --http', () => {
       })
       expect(hostStatus).toBe(403)
     } finally {
-      child.kill()
+      http.close()
     }
   })
 })
