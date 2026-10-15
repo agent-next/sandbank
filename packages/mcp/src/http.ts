@@ -22,14 +22,6 @@ export function startHttp(port: number, options?: CreateServerOptions, httpOptio
   const localOrigin = /^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/
   // Stateless: a fresh server + transport per request.
   const http = createHttpServer(async (req, res) => {
-    // Browser-based hosts (e.g. the MCP Apps reference host, MCP Inspector) call the endpoint
-    // cross-origin. Hosted mode authenticates by URL token, not cookies, so any origin may call it.
-    if (hostedPath) {
-      res.setHeader('Access-Control-Allow-Origin', '*')
-      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS')
-      res.setHeader('Access-Control-Allow-Headers', 'content-type, accept, mcp-session-id, mcp-protocol-version, last-event-id')
-      res.setHeader('Access-Control-Expose-Headers', 'mcp-session-id')
-    }
     const path = req.url?.split('?')[0] ?? ''
     if (hostedPath) {
       const got = Buffer.from(path)
@@ -41,13 +33,21 @@ export function startHttp(port: number, options?: CreateServerOptions, httpOptio
       res.writeHead(404).end()
       return
     }
-    if (hostedPath && req.method === 'OPTIONS') {
-      res.writeHead(204).end()
-      return
-    }
     const origin = req.headers.origin
     if (!hostedPath && (!hosts.has(req.headers.host ?? '') || (origin && !localOrigin.test(origin)))) {
       res.writeHead(403).end('forbidden host or origin')
+      return
+    }
+    // Browser-based hosts (e.g. the MCP Apps reference host, MCP Inspector) call the endpoint
+    // cross-origin. Hosted mode authenticates by URL token, not cookies, so any origin may call it;
+    // local mode only reaches this point for local origins.
+    res.setHeader('Access-Control-Allow-Origin', hostedPath ? '*' : (origin ?? '*'))
+    res.setHeader('Vary', 'Origin')
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS')
+    res.setHeader('Access-Control-Allow-Headers', 'content-type, accept, mcp-session-id, mcp-protocol-version, last-event-id')
+    res.setHeader('Access-Control-Expose-Headers', 'mcp-session-id')
+    if (req.method === 'OPTIONS') {
+      res.writeHead(204).end()
       return
     }
     const server = createServer(options)

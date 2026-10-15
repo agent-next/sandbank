@@ -181,6 +181,12 @@ describe('sandbank mcp --http', () => {
       })
       expect((await post({})).status).toBe(200)
       expect((await post({ origin: 'https://evil.example' })).status).toBe(403)
+      const local = await post({ origin: 'http://localhost:18480' })
+      expect(local.status).toBe(200)
+      expect(local.headers.get('access-control-allow-origin')).toBe('http://localhost:18480')
+      await local.text()
+      const preflight = await fetch(`http://127.0.0.1:${port}/mcp`, { method: 'OPTIONS', headers: { origin: 'https://evil.example' } })
+      expect(preflight.status).toBe(403)
       // fetch cannot override Host, so send this one with node:http.
       const hostStatus = await new Promise<number>((resolve, reject) => {
         const req = request({ host: '127.0.0.1', port, path: '/mcp', method: 'POST', headers: { host: `evil.example:${port}` } },
