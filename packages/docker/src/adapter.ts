@@ -206,8 +206,8 @@ export class DockerAdapter implements SandboxAdapter {
   async createSandbox(config: CreateConfig): Promise<AdapterSandbox> {
     const env = Object.entries(config.env ?? {})
     for (const [name, value] of env) {
-      if (!/^[^=\r\n]+$/.test(name) || /[\r\n]/.test(value)) {
-        throw new ProviderError('docker', new Error(`env ${name}: names cannot contain '=' and values must be single-line`))
+      if (!/^[^#=\r\n][^=\r\n]*$/.test(name) || /[\r\n]/.test(value)) {
+        throw new ProviderError('docker', new Error(`env ${name}: names cannot start with '#' or contain '=', values must be single-line`))
       }
     }
     const autoDestroySeconds = (config.autoDestroyMinutes ?? 0) * 60

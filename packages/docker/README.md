@@ -38,10 +38,10 @@ await provider.destroy(sandbox.id)
 
 - Every container is labeled `sandbank.managed=true`; `list()` and `get()` only see labeled containers.
 - The container runs `tail -f /dev/null` under `--init`, so any image with `sh` works. `autoDestroyMinutes` runs `sleep <seconds>` with `--rm` instead, so the container removes itself.
-- `env` values are passed through the docker process environment (`-e NAME`), not argv.
+- `env` values go to docker through a private (0600) temp env file that is deleted right after create; they never appear in argv. Values must be single-line.
 - Published ports bind to `127.0.0.1` by default (`bindHost` to change). `exposePort` only works for ports published at create.
-- `exec` timeouts raise `ExecTimeoutError`; the process inside the container is not killed.
-- `destroy()` runs `docker rm -f -v` and is idempotent.
+- `exec` timeouts raise `ExecTimeoutError` and kill the command's whole process tree inside the container; cancelling an `execStream` does the same.
+- `destroy()` runs `docker rm -f -v`, is idempotent, and never touches containers without the sandbank label. `deleteVolume()` likewise only removes labeled volumes.
 
 ## Configuration
 
