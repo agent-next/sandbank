@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "sandbank": {
+      "command": "npx",
+      "args": ["-y", "@sandbank.dev/mcp"],
+      "env": {
+        "SBX_API_KEY": "${SBX_API_KEY}"
+      }
+    }
+  }
+}

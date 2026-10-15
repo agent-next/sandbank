@@ -1,0 +1,50 @@
+{
+  "name": "@sandbank.dev/mcp",
+  "version": "0.1.0",
+  "description": "MCP server (with MCP Apps console UI) for Sandbank sandboxes",
+  "license": "MIT",
+  "type": "module",
+  "homepage": "https://sandbank.dev",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/chekusu/sandbank.git",
+    "directory": "packages/mcp"
+  },
+  "keywords": [
+    "sandbox",
+    "ai-agent",
+    "mcp",
+    "mcp-apps",
+    "docker",
+    "sbx"
+  ],
+  "bin": {
+    "sandbank-mcp": "./dist/bin.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc && rm -rf dist/ui && cp -r src/ui dist/ui",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.1",
+    "@sandbank.dev/core": "workspace:*",
+    "@sandbank.dev/docker": "workspace:*",
+    "@sandbank.dev/sbx": "workspace:*",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.0",
+    "typescript": "^5.7.3",
+    "vitest": "^4.0.18"
+  }
+}
