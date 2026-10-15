@@ -69,5 +69,7 @@ describe('dist/view.html', () => {
     expect(html).not.toMatch(/<script[^>]+src=/i)
     expect(html).toContain('ui/notifications/tool-result')
     expect(html).toContain('ui/initialize')
+    // Hosts hold tool-input/tool-result until the app confirms the handshake.
+    expect(html).toContain('ui/notifications/initialized')
   })
 })

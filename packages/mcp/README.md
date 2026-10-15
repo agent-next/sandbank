@@ -41,3 +41,16 @@ const server = createServer({ registry }) // registry: { [name]: { configured, g
 npx vitest run packages/mcp
 DOCKER_INTEGRATION=1 npx vitest run packages/mcp/test/docker.integration.test.ts  # real docker, alpine:3.20
 ```
+
+## Hosted mode (remote connectors)
+
+Claude and ChatGPT custom connectors need a public HTTPS URL. Set a secret path token and run the HTTP server:
+
+```bash
+export SANDBANK_MCP_TOKEN=$(openssl rand -hex 24)   # >= 32 chars; the URL path is the credential
+export SANDBANK_MCP_PROVIDERS=sbx                    # optional: hide docker on a shared host
+sandbank-mcp --http 8080                             # serves /mcp/$SANDBANK_MCP_TOKEN on 0.0.0.0
+```
+
+Put it behind HTTPS (for example in an sbx sandbox, whose port URL is `https://8080-<id>.sbx.agent-next.com`) and add `https://<host>/mcp/<token>` as the connector URL. Every other path returns 404. Treat the URL like an API key.
+

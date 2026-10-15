@@ -12,6 +12,11 @@ if (i === -1) {
     console.error('usage: sandbank-mcp [--http <port>]')
     process.exit(2)
   }
-  await startHttp(port)
-  console.error(`sandbank-mcp listening on http://127.0.0.1:${port}/mcp`)
+  const token = process.env.SANDBANK_MCP_TOKEN
+  if (token !== undefined && token.length < 32) {
+    console.error('SANDBANK_MCP_TOKEN must be at least 32 characters')
+    process.exit(2)
+  }
+  await startHttp(port, undefined, { token })
+  console.error(token ? `sandbank-mcp hosted on 0.0.0.0:${port}/mcp/<token>` : `sandbank-mcp listening on http://127.0.0.1:${port}/mcp`)
 }

@@ -107,7 +107,7 @@ export const BarChart = defineComponent({
     return (
       <figure className="chart">
         {props.title ? <figcaption>{props.title}</figcaption> : null}
-        <svg role="img" aria-label={props.title ?? 'bar chart'} viewBox={`0 0 400 ${Math.max(1, labels.length) * rowH}`} width="100%">
+        <svg role="img" aria-label={props.title ?? 'bar chart'} viewBox={`0 0 400 ${Math.max(1, labels.length) * rowH}`} width="100%" style={{ maxWidth: 560 }}>
           {labels.map((l, i) => {
             const w = ((values[i] ?? 0) / max) * 230
             return (
