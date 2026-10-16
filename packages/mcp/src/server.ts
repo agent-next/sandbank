@@ -59,7 +59,7 @@ export function createServer(options: CreateServerOptions = {}): McpServer {
   const resolve = (name: string): SandboxProvider => {
     const entry = registry[name]
     if (!entry) throw new Error(`Unknown provider "${name}" (available: ${Object.keys(registry).join(', ')})`)
-    if (!entry.configured) throw new Error(`Provider "${name}" is not configured (set SBX_API_KEY or E2B_API_KEY)`)
+    if (!entry.configured) throw new Error(`Provider "${name}" is not configured (sbx: SBX_API_KEY or E2B_API_KEY; cloudflare: SANDBANK_CF_BRIDGE_URL and SANDBANK_CF_BRIDGE_TOKEN)`)
     return entry.get()
   }
 

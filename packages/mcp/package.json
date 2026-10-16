@@ -16,7 +16,8 @@
     "mcp",
     "mcp-apps",
     "docker",
-    "sbx"
+    "sbx",
+    "cloudflare"
   ],
   "bin": {
     "sandbank-mcp": "./dist/bin.js"
@@ -37,6 +38,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.1",
+    "@sandbank.dev/cloudflare-bridge": "workspace:*",
     "@sandbank.dev/core": "workspace:*",
     "@sandbank.dev/docker": "workspace:*",
     "@sandbank.dev/openui-view": "workspace:*",
