@@ -41,3 +41,17 @@ SANDBANK_CF_BRIDGE_TOKEN=<token> npx @sandbank.dev/mcp
 ```
 
 Without both variables `providers_list` shows `cloudflare (not configured)`.
+
+## References
+
+Cloudflare documentation used for this package:
+
+- Sandbox SDK Wrangler configuration: https://developers.cloudflare.com/sandbox/sdk/configuration/wrangler/
+- Sandboxes get started: https://developers.cloudflare.com/sandbox/get-started/
+- Containers limits and instance types: https://developers.cloudflare.com/containers/platform/limits/
+- Containers pricing: https://developers.cloudflare.com/containers/pricing/
+- Containers scheduling policy: https://developers.cloudflare.com/containers/configuration/scheduling-policy/
+- Durable Objects alarms: https://developers.cloudflare.com/durable-objects/api/alarms/
+- Cron Triggers: https://developers.cloudflare.com/workers/configuration/cron-triggers/
+- Wrangler configuration: https://developers.cloudflare.com/workers/wrangler/configuration/
+- Wrangler `containers` commands: https://developers.cloudflare.com/workers/wrangler/commands/containers/
