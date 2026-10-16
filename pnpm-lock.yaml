@@ -106,6 +106,31 @@ importers:
         specifier: ^4.0.0
         version: 4.68.1(@cloudflare/workers-types@4.20260305.0)
 
+  packages/cloudflare-bridge:
+    dependencies:
+      '@sandbank.dev/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      '@cloudflare/sandbox':
+        specifier: 0.7.6
+        version: 0.7.6
+      '@cloudflare/workers-types':
+        specifier: ^4.20250214.0
+        version: 4.20260305.0
+      '@types/node':
+        specifier: ^25.3.0
+        version: 25.5.0
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+      vitest:
+        specifier: ^4.0.18
+        version: 4.0.18(@opentelemetry/api@1.9.0)(@types/node@25.5.0)(tsx@4.21.0)
+      wrangler:
+        specifier: ^4.0.0
+        version: 4.68.1(@cloudflare/workers-types@4.20260305.0)
+
   packages/core:
     devDependencies:
       '@sandbank.dev/relay':
@@ -203,6 +228,9 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: 1.32.1
         version: 1.32.1(zod@3.25.76)
+      '@sandbank.dev/cloudflare-bridge':
+        specifier: workspace:*
+        version: link:../cloudflare-bridge
       '@sandbank.dev/core':
         specifier: workspace:*
         version: link:../core

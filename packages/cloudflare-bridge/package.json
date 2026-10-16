@@ -1,0 +1,40 @@
+{
+  "name": "@sandbank.dev/cloudflare-bridge",
+  "version": "0.0.1",
+  "description": "Cloudflare Sandbox bridge Worker and HTTP client adapter for Sandbank",
+  "license": "MIT",
+  "type": "module",
+  "homepage": "https://sandbank.dev",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/agent-next/sandbank.git",
+    "directory": "packages/cloudflare-bridge"
+  },
+  "keywords": ["sandbox", "ai-agent", "cloudflare", "containers", "mcp"],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.worker.json",
+    "clean": "rm -rf dist",
+    "deploy:dry-run": "wrangler deploy --dry-run --outdir .wrangler-dry-run"
+  },
+  "dependencies": {
+    "@sandbank.dev/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@cloudflare/sandbox": "0.7.6",
+    "@cloudflare/workers-types": "^4.20250214.0",
+    "@types/node": "^25.3.0",
+    "typescript": "^5.7.3",
+    "vitest": "^4.0.18",
+    "wrangler": "^4.0.0"
+  }
+}

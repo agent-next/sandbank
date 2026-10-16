@@ -1,5 +1,6 @@
 import { createProvider } from '@sandbank.dev/core'
 import type { SandboxProvider } from '@sandbank.dev/core'
+import { CloudflareBridgeAdapter } from '@sandbank.dev/cloudflare-bridge'
 import { DockerAdapter } from '@sandbank.dev/docker'
 import { SbxAdapter } from '@sandbank.dev/sbx'
 
@@ -23,6 +24,9 @@ export function defaultRegistry(env: NodeJS.ProcessEnv = process.env): ProviderR
   const all: ProviderRegistry = {
     docker: lazy(true, () => createProvider(new DockerAdapter())),
     sbx: lazy(isSet(env.SBX_API_KEY) || isSet(env.E2B_API_KEY), () => createProvider(new SbxAdapter())),
+    cloudflare: lazy(isSet(env.SANDBANK_CF_BRIDGE_URL) && isSet(env.SANDBANK_CF_BRIDGE_TOKEN), () =>
+      createProvider(new CloudflareBridgeAdapter({ url: env.SANDBANK_CF_BRIDGE_URL!, token: env.SANDBANK_CF_BRIDGE_TOKEN! })),
+    ),
   }
   // SANDBANK_MCP_PROVIDERS=sbx limits what the server exposes (e.g. hide docker on a hosted server).
   const only = env.SANDBANK_MCP_PROVIDERS?.split(',').map((s) => s.trim()).filter(Boolean)
