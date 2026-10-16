@@ -1,6 +1,6 @@
 import { isDrain } from './alarm-guard.js'
 import { isAuthorized } from './auth.js'
-import { MAX_BODY_BYTES, MAX_EXEC_TIMEOUT_MS } from './limits.js'
+import { DEFAULT_CREATE_DEADLINE, MAX_BODY_BYTES, MAX_EXEC_TIMEOUT_MS } from './limits.js'
 import { clampLifetimeMin, type ReserveResult, type SandboxEntry } from './registry-core.js'
 
 export interface RegistryPort {
@@ -19,7 +19,7 @@ export interface Backend {
 }
 
 export interface BridgeDeps {
-  env: { BRIDGE_TOKEN?: string; DRAIN?: string; PREVIEW_HOSTNAME?: string }
+  env: { BRIDGE_TOKEN?: string; DRAIN?: string; PREVIEW_HOSTNAME?: string; CREATE_DEADLINE?: string }
   registry: RegistryPort
   backend: Backend
   now: () => number
@@ -90,6 +90,9 @@ export async function handle(request: Request, deps: BridgeDeps): Promise<Respon
       }
       if (request.method === 'POST') {
         const body = await readJson(request)
+        // Unparseable deadline fails closed.
+        const deadline = Date.parse(deps.env.CREATE_DEADLINE ?? DEFAULT_CREATE_DEADLINE)
+        if (!(deps.now() < deadline)) return json(403, { error: 'sandbox creation is closed (credit-end deadline passed)', code: 'deadline' })
         await reap(deps)
         const newId = deps.newId()
         const r = await deps.registry.reserve(newId, clampLifetimeMin(body.lifetimeMinutes), deps.now())

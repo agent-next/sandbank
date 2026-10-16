@@ -107,6 +107,22 @@ describe('cap and lifetime (safety 1, 4)', () => {
   })
 })
 
+describe('credit-end deadline', () => {
+  it('refuses create at or after the deadline but still serves existing sandboxes', async () => {
+    const s = setup({ BRIDGE_TOKEN: 'secret', CREATE_DEADLINE: new Date(1_000_000 + 1000).toISOString() })
+    expect((await s.req('POST', '/v1/sandboxes', {})).status).toBe(201)
+    s.advance(1000)
+    const r = await s.req('POST', '/v1/sandboxes', {})
+    expect(r.status).toBe(403)
+    expect(await r.json()).toMatchObject({ code: 'deadline' })
+    expect((await s.req('GET', '/v1/sandboxes/cf-1')).status).toBe(200)
+  })
+  it('fails closed on an unparseable deadline', async () => {
+    const s = setup({ BRIDGE_TOKEN: 'secret', CREATE_DEADLINE: 'garbage' })
+    expect((await s.req('POST', '/v1/sandboxes', {})).status).toBe(403)
+  })
+})
+
 describe('operations', () => {
   it('exec, files, ports, delete', async () => {
     const s = setup({ BRIDGE_TOKEN: 'secret', PREVIEW_HOSTNAME: 'p.example' })

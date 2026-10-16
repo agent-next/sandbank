@@ -8,3 +8,5 @@ export const SLEEP_AFTER = '5m'
 export const MAX_ALARM_HORIZON_S = 3600
 export const MAX_EXEC_TIMEOUT_MS = 300_000
 export const MAX_BODY_BYTES = 8 * 1024 * 1024
+/** Credit-end hard stop: sandbox creation is refused from this instant (override with the CREATE_DEADLINE var). */
+export const DEFAULT_CREATE_DEADLINE = '2026-10-22T23:00:00Z'
