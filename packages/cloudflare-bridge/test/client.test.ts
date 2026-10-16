@@ -45,4 +45,27 @@ describe('CloudflareBridgeAdapter', () => {
     const { a } = adapter(() => reply(200, { sandboxes: [info, { ...info, id: 'cf-2' }] }))
     expect((await a.listSandboxes({ limit: 1 })).map((s) => s.id)).toEqual(['cf-1'])
   })
+  it('retries idempotent calls once on a network failure, never exec or create', async () => {
+    let n = 0
+    const flaky = (ok: Response) => async () => {
+      if (n++ === 0) throw new TypeError('fetch failed')
+      return ok
+    }
+    const list = new CloudflareBridgeAdapter({ url: 'https://b', token: 't', fetch: flaky(reply(200, { sandboxes: [] })) as never })
+    expect(await list.listSandboxes()).toEqual([])
+    expect(n).toBe(2)
+
+    n = 0
+    const create = new CloudflareBridgeAdapter({ url: 'https://b', token: 't', fetch: flaky(reply(201, info)) as never })
+    await expect(create.createSandbox({})).rejects.toBeInstanceOf(ProviderError)
+    expect(n).toBe(1)
+
+    n = 0
+    const exec = new CloudflareBridgeAdapter({ url: 'https://b', token: 't', fetch: (async (u: string) => {
+      if (String(u).endsWith('/exec')) { n++; throw new TypeError('fetch failed') }
+      return reply(200, info)
+    }) as never })
+    await expect((await exec.getSandbox('cf-1')).exec('ls')).rejects.toBeInstanceOf(ProviderError)
+    expect(n).toBe(1)
+  })
 })

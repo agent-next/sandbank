@@ -36,14 +36,17 @@ export class CloudflareBridgeAdapter implements SandboxAdapter {
     this.doFetch = config.fetch ?? fetch
   }
 
-  private async call<T>(method: string, path: string, body?: unknown, id?: string): Promise<T> {
-    let res: Response
-    try {
-      res = await this.doFetch(`${this.base}/v1/sandboxes${path}`, {
+  private async call<T>(method: string, path: string, body?: unknown, id?: string, idempotent = false): Promise<T> {
+    const send = () =>
+      this.doFetch(`${this.base}/v1/sandboxes${path}`, {
         method,
         headers: { authorization: `Bearer ${this.token}`, 'content-type': 'application/json' },
         body: body === undefined ? undefined : JSON.stringify(body),
       })
+    let res: Response
+    try {
+      // A stale keep-alive socket fails the first attempt; safe to retry once only for idempotent calls.
+      res = await send().catch((err) => (idempotent ? send() : Promise.reject(err)))
     } catch (err) {
       throw new ProviderError(PROVIDER, err, id)
     }
@@ -62,11 +65,11 @@ export class CloudflareBridgeAdapter implements SandboxAdapter {
   }
 
   async getSandbox(id: string): Promise<AdapterSandbox> {
-    return this.wrap(await this.call<BridgeSandboxInfo>('GET', `/${encodeURIComponent(id)}`, undefined, id))
+    return this.wrap(await this.call<BridgeSandboxInfo>('GET', `/${encodeURIComponent(id)}`, undefined, id, true))
   }
 
   async listSandboxes(filter?: ListFilter): Promise<SandboxInfo[]> {
-    const { sandboxes } = await this.call<{ sandboxes: BridgeSandboxInfo[] }>('GET', '')
+    const { sandboxes } = await this.call<{ sandboxes: BridgeSandboxInfo[] }>('GET', '', undefined, undefined, true)
     let infos: SandboxInfo[] = sandboxes.map((s) => ({ id: s.id, state: s.state, createdAt: s.createdAt, image: '' }))
     if (filter?.state) {
       const states = Array.isArray(filter.state) ? filter.state : [filter.state]
@@ -77,7 +80,7 @@ export class CloudflareBridgeAdapter implements SandboxAdapter {
 
   async destroySandbox(id: string): Promise<void> {
     try {
-      await this.call('DELETE', `/${encodeURIComponent(id)}`, undefined, id)
+      await this.call('DELETE', `/${encodeURIComponent(id)}`, undefined, id, true)
     } catch (err) {
       if (!(err instanceof SandboxNotFoundError)) throw err
     }
@@ -97,7 +100,7 @@ export class CloudflareBridgeAdapter implements SandboxAdapter {
         await this.call('POST', `${p}/files/write`, { path, contentBase64: Buffer.from(bytes).toString('base64') }, id)
       },
       readFile: async (path: string) => {
-        const { contentBase64 } = await this.call<{ contentBase64: string }>('POST', `${p}/files/read`, { path }, id)
+        const { contentBase64 } = await this.call<{ contentBase64: string }>('POST', `${p}/files/read`, { path }, id, true)
         return new Uint8Array(Buffer.from(contentBase64, 'base64'))
       },
       exposePort: (port: number) => this.call<{ url: string }>('POST', `${p}/ports`, { port }, id),
