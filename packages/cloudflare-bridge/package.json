@@ -7,7 +7,7 @@
   "homepage": "https://sandbank.dev",
   "repository": {
     "type": "git",
-    "url": "https://github.com/chekusu/sandbank.git",
+    "url": "https://github.com/agent-next/sandbank.git",
     "directory": "packages/cloudflare-bridge"
   },
   "keywords": ["sandbox", "ai-agent", "cloudflare", "containers", "mcp"],

@@ -70,7 +70,10 @@ describe('cap and lifetime (safety 1, 4)', () => {
   it('a failed create releases its slot', async () => {
     const s = setup()
     s.backend.create.mockRejectedValueOnce(new Error('boom'))
-    expect((await s.req('POST', '/v1/sandboxes', {})).status).toBe(500)
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    const r = await s.req('POST', '/v1/sandboxes', {})
+    expect(r.status).toBe(500)
+    expect(await r.json()).toEqual({ error: 'internal error' })
     expect(s.entries()).toEqual([])
   })
   it('destroys expired sandboxes on access (410) and frees the slot', async () => {
@@ -117,9 +120,43 @@ describe('credit-end deadline', () => {
     expect(await r.json()).toMatchObject({ code: 'deadline' })
     expect((await s.req('GET', '/v1/sandboxes/cf-1')).status).toBe(200)
   })
+  it('has no deadline unless one is configured', async () => {
+    const s = setup()
+    s.advance(10 * 365 * 86_400_000)
+    expect((await s.req('POST', '/v1/sandboxes', {})).status).toBe(201)
+  })
   it('fails closed on an unparseable deadline', async () => {
     const s = setup({ BRIDGE_TOKEN: 'secret', CREATE_DEADLINE: 'garbage' })
     expect((await s.req('POST', '/v1/sandboxes', {})).status).toBe(403)
+  })
+})
+
+describe('body cap', () => {
+  it('rejects a declared oversized body before reading it', async () => {
+    const s = setup()
+    const r = await handle(
+      new Request('https://bridge.test/v1/sandboxes', { method: 'POST', headers: { authorization: 'Bearer secret', 'content-length': String(9 * 1024 * 1024) }, body: '{}' }),
+      s.deps,
+    )
+    expect(r.status).toBe(413)
+    expect(s.backend.create).not.toHaveBeenCalled()
+  })
+  it('aborts a streamed body that exceeds the cap without a content-length', async () => {
+    const s = setup()
+    const chunk = new Uint8Array(1024 * 1024)
+    let sent = 0
+    const body = new ReadableStream<Uint8Array>({
+      pull(c) {
+        if (sent++ >= 20) return c.close()
+        c.enqueue(chunk)
+      },
+    })
+    const r = await handle(
+      new Request('https://bridge.test/v1/sandboxes', { method: 'POST', headers: { authorization: 'Bearer secret' }, body, duplex: 'half' } as RequestInit),
+      s.deps,
+    )
+    expect(r.status).toBe(413)
+    expect(sent).toBeLessThan(20)
   })
 })
 

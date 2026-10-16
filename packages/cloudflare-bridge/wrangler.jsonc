@@ -3,7 +3,7 @@
   "main": "src/worker/index.ts",
   "compatibility_date": "2025-01-13",
   "compatibility_flags": ["nodejs_compat"],
-  "vars": { "DRAIN": "0", "CREATE_DEADLINE": "2026-10-22T23:00:00Z" },
+  "vars": { "DRAIN": "0" },
   "triggers": { "crons": ["*/5 * * * *"] },
   "containers": [
     {

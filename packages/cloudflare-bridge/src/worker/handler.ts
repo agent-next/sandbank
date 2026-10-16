@@ -1,6 +1,6 @@
 import { isDrain } from './alarm-guard.js'
 import { isAuthorized } from './auth.js'
-import { DEFAULT_CREATE_DEADLINE, MAX_BODY_BYTES, MAX_EXEC_TIMEOUT_MS } from './limits.js'
+import { MAX_BODY_BYTES, MAX_EXEC_TIMEOUT_MS } from './limits.js'
 import { clampLifetimeMin, type ReserveResult, type SandboxEntry } from './registry-core.js'
 
 export interface RegistryPort {
@@ -49,9 +49,35 @@ export async function reap(deps: BridgeDeps, all = false): Promise<string[]> {
   return gone
 }
 
+/** Reads the body, aborting as soon as it exceeds the cap (Content-Length can be absent or wrong). */
+async function readCapped(request: Request): Promise<string> {
+  if (!request.body) return ''
+  const reader = request.body.getReader()
+  const chunks: Uint8Array[] = []
+  let size = 0
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    size += value.byteLength
+    if (size > MAX_BODY_BYTES) {
+      await reader.cancel()
+      throw new HttpError(413, 'request body too large')
+    }
+    chunks.push(value)
+  }
+  const all = new Uint8Array(size)
+  let off = 0
+  for (const c of chunks) {
+    all.set(c, off)
+    off += c.byteLength
+  }
+  return new TextDecoder().decode(all)
+}
+
 async function readJson(request: Request): Promise<Record<string, unknown>> {
-  const text = await request.text()
-  if (text.length > MAX_BODY_BYTES) throw new HttpError(413, 'request body too large')
+  const declared = Number(request.headers.get('content-length') ?? 0)
+  if (declared > MAX_BODY_BYTES) throw new HttpError(413, 'request body too large')
+  const text = await readCapped(request)
   if (!text) return {}
   try {
     const v = JSON.parse(text)
@@ -90,9 +116,9 @@ export async function handle(request: Request, deps: BridgeDeps): Promise<Respon
       }
       if (request.method === 'POST') {
         const body = await readJson(request)
-        // Unparseable deadline fails closed.
-        const deadline = Date.parse(deps.env.CREATE_DEADLINE ?? DEFAULT_CREATE_DEADLINE)
-        if (!(deps.now() < deadline)) return json(403, { error: 'sandbox creation is closed (credit-end deadline passed)', code: 'deadline' })
+        // Optional operator-set cutoff; an unparseable value fails closed.
+        const cutoff = deps.env.CREATE_DEADLINE
+        if (cutoff && !(deps.now() < Date.parse(cutoff))) return json(403, { error: 'sandbox creation is closed (deadline passed)', code: 'deadline' })
         await reap(deps)
         const newId = deps.newId()
         const r = await deps.registry.reserve(newId, clampLifetimeMin(body.lifetimeMinutes), deps.now())
@@ -142,6 +168,7 @@ export async function handle(request: Request, deps: BridgeDeps): Promise<Respon
       return json(200, { ok: true })
     }
     if (action === 'ports') {
+      // 3000 is reserved by the Sandbox SDK control plane inside the container.
       const port = body.port
       if (typeof port !== 'number' || !Number.isInteger(port) || port < 1024 || port > 65535 || port === 3000) {
         throw new HttpError(400, 'port must be an integer in 1024-65535, excluding 3000')
@@ -152,6 +179,7 @@ export async function handle(request: Request, deps: BridgeDeps): Promise<Respon
     return json(404, { error: 'not found' })
   } catch (err) {
     if (err instanceof HttpError) return json(err.status, { error: err.message })
-    return json(500, { error: err instanceof Error ? err.message : String(err) })
+    console.error('bridge request failed', err)
+    return json(500, { error: 'internal error' })
   }
 }
