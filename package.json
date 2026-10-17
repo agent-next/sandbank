@@ -10,7 +10,7 @@
     "url": "https://github.com/chekusu/sandbank.git"
   },
   "scripts": {
-    "build": "pnpm -r build",
+    "build": "pnpm --filter @sandbank.dev/core build && pnpm -r build",
     "typecheck": "pnpm -r typecheck",
     "clean": "pnpm -r clean",
     "test": "vitest run",
