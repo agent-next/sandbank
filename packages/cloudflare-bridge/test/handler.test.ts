@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { handle, reap, type Backend, type BridgeDeps } from '../src/worker/handler.js'
 import { RegistryCore, type SandboxEntry } from '../src/worker/registry-core.js'
-import { MAX_SANDBOXES } from '../src/worker/limits.js'
+import { CREATE_TIMEOUT_MS, MAX_SANDBOXES, PROVISIONING_REAP_MS } from '../src/worker/limits.js'
 
 function setup(env: BridgeDeps['env'] = { BRIDGE_TOKEN: 'secret' }) {
   let entries: SandboxEntry[] = []
@@ -76,6 +76,59 @@ describe('cap and lifetime (safety 1, 4)', () => {
     expect(r.status).toBe(500)
     expect(await r.json()).toEqual({ error: 'internal error' })
     expect(s.entries()).toEqual([])
+  })
+  it('a container that does not start in time answers 503 provisioning and is reaped later, never orphaned', async () => {
+    vi.useFakeTimers()
+    try {
+      const s = setup()
+      let start!: () => void
+      s.backend.create.mockImplementationOnce(() => new Promise<void>((res) => (start = res)))
+      const pending = s.req('POST', '/v1/sandboxes', {})
+      // the handler awaits the registry before it arms the timer, so advance in steps
+      for (let i = 0; i < 4; i++) await vi.advanceTimersByTimeAsync(CREATE_TIMEOUT_MS / 2)
+      const r = await pending
+      expect(r.status).toBe(503)
+      expect(r.headers.get('retry-after')).toBe('30')
+      expect(await r.json()).toMatchObject({ code: 'provisioning' })
+      // the slot stays held (the container may still come up) with a short expiry, and nothing is destroyed yet
+      expect(s.entries()).toEqual([expect.objectContaining({ id: 'cf-1', expiresAt: 1_000_000 + PROVISIONING_REAP_MS })])
+      expect(s.backend.destroy).not.toHaveBeenCalled()
+      start() // the late container comes up
+      s.advance(PROVISIONING_REAP_MS + 1)
+      expect((await s.req('GET', '/v1/sandboxes')).status).toBe(200) // any request reaps
+      expect(s.backend.destroy).toHaveBeenCalledWith('cf-1')
+      expect(s.entries()).toEqual([])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+  it('a create that fails after the provisioning timeout is logged, not an unhandled rejection', async () => {
+    vi.useFakeTimers()
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      const s = setup()
+      let fail!: (e: Error) => void
+      s.backend.create.mockImplementationOnce(() => new Promise<void>((_, rej) => (fail = rej)))
+      const pending = s.req('POST', '/v1/sandboxes', {})
+      for (let i = 0; i < 4; i++) await vi.advanceTimersByTimeAsync(CREATE_TIMEOUT_MS / 2)
+      expect((await pending).status).toBe(503)
+      fail(new Error('start failed'))
+      await vi.advanceTimersByTimeAsync(1)
+      expect(log).toHaveBeenCalledWith('create cf-1 failed after the provisioning timeout', expect.any(Error))
+    } finally {
+      log.mockRestore()
+      vi.useRealTimers()
+    }
+  })
+  it('a create that starts in time clears its timer', async () => {
+    vi.useFakeTimers()
+    try {
+      const s = setup()
+      expect((await s.req('POST', '/v1/sandboxes', {})).status).toBe(201)
+      expect(vi.getTimerCount()).toBe(0)
+    } finally {
+      vi.useRealTimers()
+    }
   })
   it('destroys expired sandboxes on access (410) and frees the slot', async () => {
     const s = setup()

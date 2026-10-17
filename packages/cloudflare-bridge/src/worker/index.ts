@@ -43,7 +43,12 @@ function deps(env: Env): BridgeDeps {
   return {
     env,
     backend,
-    registry: { reserve: (i, m, n) => reg.reserve(i, m, n), list: () => reg.list(), release: (i) => reg.release(i) },
+    registry: {
+      reserve: (i, m, n) => reg.reserve(i, m, n),
+      list: () => reg.list(),
+      expire: (i, at) => reg.expire(i, at),
+      release: (i) => reg.release(i),
+    },
     now: () => Date.now(),
     newId: () => `cf-${crypto.randomUUID().slice(0, 8)}`,
   }

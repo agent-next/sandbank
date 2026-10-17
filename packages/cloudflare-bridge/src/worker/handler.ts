@@ -1,11 +1,12 @@
 import { isDrain } from './alarm-guard.js'
 import { isAuthorized } from './auth.js'
-import { MAX_BODY_BYTES, MAX_EXEC_TIMEOUT_MS } from './limits.js'
+import { CREATE_TIMEOUT_MS, MAX_BODY_BYTES, MAX_EXEC_TIMEOUT_MS, PROVISIONING_REAP_MS } from './limits.js'
 import { clampLifetimeMin, type ReserveResult, type SandboxEntry } from './registry-core.js'
 
 export interface RegistryPort {
   reserve(id: string, lifetimeMin: number, now: number): Promise<ReserveResult>
   list(): Promise<SandboxEntry[]>
+  expire(id: string, at: number): Promise<void>
   release(id: string): Promise<void>
 }
 
@@ -26,8 +27,8 @@ export interface BridgeDeps {
   newId: () => string
 }
 
-const json = (status: number, body: unknown) =>
-  new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })
+const json = (status: number, body: unknown, headers: Record<string, string> = {}) =>
+  new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json', ...headers } })
 
 const info = (e: SandboxEntry) => ({
   id: e.id,
@@ -123,11 +124,22 @@ export async function handle(request: Request, deps: BridgeDeps): Promise<Respon
         const newId = deps.newId()
         const r = await deps.registry.reserve(newId, clampLifetimeMin(body.lifetimeMinutes), deps.now())
         if (!r.ok) return json(429, { error: `sandbox cap reached (${r.max} concurrent); destroy one first`, code: 'capacity' })
+        let timer: ReturnType<typeof setTimeout> | undefined
+        const timedOut = new Promise<'timeout'>((res) => (timer = setTimeout(() => res('timeout'), CREATE_TIMEOUT_MS)))
+        const created = deps.backend.create(newId, body.env as Record<string, string> | undefined)
         try {
-          await deps.backend.create(newId, body.env as Record<string, string> | undefined)
+          if ((await Promise.race([created, timedOut])) === 'timeout') {
+            // The container may still come up: keep its slot and let the reaper destroy it at this expiry.
+            created.catch((err) => console.error(`create ${newId} failed after the provisioning timeout`, err))
+            await deps.registry.expire(newId, deps.now() + PROVISIONING_REAP_MS)
+            return json(503, { error: `container did not start within ${CREATE_TIMEOUT_MS / 1000} s; retry`, code: 'provisioning' },
+              { 'retry-after': '30' })
+          }
         } catch (err) {
           await deps.registry.release(newId)
           throw err
+        } finally {
+          if (timer !== undefined) clearTimeout(timer)
         }
         return json(201, info(r.entry))
       }
