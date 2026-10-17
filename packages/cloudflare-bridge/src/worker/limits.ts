@@ -1,5 +1,7 @@
 /** Hard safety limits. Cloudflare has no spending cap, so these are the cap. */
-export const MAX_SANDBOXES = 3
+/** Sized for an agent fleet (one Claude Code worker per sandbox); 256 x standard-1 = 128 vCPU,
+ * well inside the account limit of 1,500 concurrent vCPU. */
+export const MAX_SANDBOXES = 256
 export const DEFAULT_LIFETIME_MIN = 30
 export const MAX_LIFETIME_MIN = 60
 /** Container idle sleep; must stay <= 5 minutes. */

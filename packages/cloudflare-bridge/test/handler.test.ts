@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { handle, reap, type Backend, type BridgeDeps } from '../src/worker/handler.js'
 import { RegistryCore, type SandboxEntry } from '../src/worker/registry-core.js'
+import { MAX_SANDBOXES } from '../src/worker/limits.js'
 
 function setup(env: BridgeDeps['env'] = { BRIDGE_TOKEN: 'secret' }) {
   let entries: SandboxEntry[] = []
@@ -61,11 +62,11 @@ describe('DRAIN (safety 2)', () => {
 describe('cap and lifetime (safety 1, 4)', () => {
   it('returns a clear 429 at the cap', async () => {
     const s = setup()
-    for (let i = 0; i < 3; i++) expect((await s.req('POST', '/v1/sandboxes', {})).status).toBe(201)
+    for (let i = 0; i < MAX_SANDBOXES; i++) expect((await s.req('POST', '/v1/sandboxes', {})).status).toBe(201)
     const r = await s.req('POST', '/v1/sandboxes', {})
     expect(r.status).toBe(429)
-    expect(await r.json()).toMatchObject({ code: 'capacity', error: expect.stringContaining('cap reached (3 concurrent)') })
-    expect(s.backend.create).toHaveBeenCalledTimes(3)
+    expect(await r.json()).toMatchObject({ code: 'capacity', error: expect.stringContaining(`cap reached (${MAX_SANDBOXES} concurrent)`) })
+    expect(s.backend.create).toHaveBeenCalledTimes(MAX_SANDBOXES)
   })
   it('a failed create releases its slot', async () => {
     const s = setup()
@@ -88,7 +89,7 @@ describe('cap and lifetime (safety 1, 4)', () => {
   })
   it('reaps expired sandboxes before enforcing the cap on create', async () => {
     const s = setup()
-    for (let i = 0; i < 3; i++) await s.req('POST', '/v1/sandboxes', { lifetimeMinutes: 1 })
+    for (let i = 0; i < MAX_SANDBOXES; i++) await s.req('POST', '/v1/sandboxes', { lifetimeMinutes: 1 })
     s.advance(61_000)
     expect((await s.req('POST', '/v1/sandboxes', {})).status).toBe(201)
   })
