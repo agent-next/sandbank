@@ -1,6 +1,6 @@
 import { isDrain } from './alarm-guard.js'
 import { isAuthorized } from './auth.js'
-import { MAX_BODY_BYTES, MAX_EXEC_TIMEOUT_MS } from './limits.js'
+import { CREATE_TIMEOUT_MS, MAX_BODY_BYTES, MAX_EXEC_TIMEOUT_MS } from './limits.js'
 import { clampLifetimeMin, type ReserveResult, type SandboxEntry } from './registry-core.js'
 
 export interface RegistryPort {
@@ -123,11 +123,21 @@ export async function handle(request: Request, deps: BridgeDeps): Promise<Respon
         const newId = deps.newId()
         const r = await deps.registry.reserve(newId, clampLifetimeMin(body.lifetimeMinutes), deps.now())
         if (!r.ok) return json(429, { error: `sandbox cap reached (${r.max} concurrent); destroy one first`, code: 'capacity' })
+        let timer: ReturnType<typeof setTimeout> | undefined
+        const timedOut = new Promise<'timeout'>((res) => (timer = setTimeout(() => res('timeout'), CREATE_TIMEOUT_MS)))
         try {
-          await deps.backend.create(newId, body.env as Record<string, string> | undefined)
+          const started = await Promise.race([deps.backend.create(newId, body.env as Record<string, string> | undefined), timedOut])
+          if (started === 'timeout') {
+            await deps.backend.destroy(newId).catch(() => {})
+            await deps.registry.release(newId)
+            return new Response(JSON.stringify({ error: `container did not start within ${CREATE_TIMEOUT_MS / 1000} s; retry`, code: 'provisioning' }),
+              { status: 503, headers: { 'content-type': 'application/json', 'retry-after': '10' } })
+          }
         } catch (err) {
           await deps.registry.release(newId)
           throw err
+        } finally {
+          if (timer !== undefined) clearTimeout(timer)
         }
         return json(201, info(r.entry))
       }

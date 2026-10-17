@@ -9,4 +9,7 @@ export const SLEEP_AFTER = '5m'
 /** No alarm or schedule may be set further out than this. */
 export const MAX_ALARM_HORIZON_S = 3600
 export const MAX_EXEC_TIMEOUT_MS = 300_000
+/** A create whose container has not started by then is undone (503 provisioning, client retries):
+ * at 256 parallel creates some cold starts took > 5 min and outlived the caller. */
+export const CREATE_TIMEOUT_MS = 90_000
 export const MAX_BODY_BYTES = 8 * 1024 * 1024

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { handle, reap, type Backend, type BridgeDeps } from '../src/worker/handler.js'
 import { RegistryCore, type SandboxEntry } from '../src/worker/registry-core.js'
-import { MAX_SANDBOXES } from '../src/worker/limits.js'
+import { CREATE_TIMEOUT_MS, MAX_SANDBOXES } from '../src/worker/limits.js'
 
 function setup(env: BridgeDeps['env'] = { BRIDGE_TOKEN: 'secret' }) {
   let entries: SandboxEntry[] = []
@@ -76,6 +76,24 @@ describe('cap and lifetime (safety 1, 4)', () => {
     expect(r.status).toBe(500)
     expect(await r.json()).toEqual({ error: 'internal error' })
     expect(s.entries()).toEqual([])
+  })
+  it('a container that does not start in time answers 503 provisioning, destroys it and frees the slot', async () => {
+    vi.useFakeTimers()
+    try {
+      const s = setup()
+      s.backend.create.mockImplementationOnce(() => new Promise<void>(() => {}))
+      const pending = s.req('POST', '/v1/sandboxes', {})
+      // the handler awaits the registry before it arms the timer, so advance in steps
+      for (let i = 0; i < 4; i++) await vi.advanceTimersByTimeAsync(CREATE_TIMEOUT_MS / 2)
+      const r = await pending
+      expect(r.status).toBe(503)
+      expect(r.headers.get('retry-after')).toBe('10')
+      expect(await r.json()).toMatchObject({ code: 'provisioning' })
+      expect(s.backend.destroy).toHaveBeenCalledWith('cf-1')
+      expect(s.entries()).toEqual([])
+    } finally {
+      vi.useRealTimers()
+    }
   })
   it('destroys expired sandboxes on access (410) and frees the slot', async () => {
     const s = setup()
