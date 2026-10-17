@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { handle, reap, type Backend, type BridgeDeps } from '../src/worker/handler.js'
 import { RegistryCore, type SandboxEntry } from '../src/worker/registry-core.js'
-import { CREATE_TIMEOUT_MS, MAX_SANDBOXES, PROVISIONING_REAP_MS } from '../src/worker/limits.js'
+import { CREATE_TIMEOUT_MS, DESTROY_TIMEOUT_MS, MAX_SANDBOXES, PROVISIONING_REAP_MS } from '../src/worker/limits.js'
 
 function setup(env: BridgeDeps['env'] = { BRIDGE_TOKEN: 'secret' }) {
   let entries: SandboxEntry[] = []
@@ -139,6 +139,32 @@ describe('cap and lifetime (safety 1, 4)', () => {
     expect(s.backend.destroy).toHaveBeenCalledWith('cf-1')
     expect(s.backend.exec).not.toHaveBeenCalled()
     expect(s.entries()).toEqual([])
+  })
+  it('a destroy that never returns does not block create or list (reap is bounded)', async () => {
+    // 2026-10-17: one wedged sandbox DO made every create and list hang for minutes, because each
+    // request reaps inline and waited on that destroy
+    vi.useFakeTimers()
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      const s = setup()
+      await s.req('POST', '/v1/sandboxes', { lifetimeMinutes: 1 })
+      s.advance(61_000)
+      s.backend.destroy.mockImplementation(() => new Promise<void>(() => {}))
+      // timers register after the async auth check: step the clock past the bound, as a slow DO would
+      const settle = async () => { for (let i = 0; i < 4; i++) await vi.advanceTimersByTimeAsync(DESTROY_TIMEOUT_MS / 2) }
+      const pending = s.req('POST', '/v1/sandboxes', {})
+      await settle()
+      expect((await pending).status).toBe(201)
+      const list = s.req('GET', '/v1/sandboxes')
+      await settle()
+      expect((await list).status).toBe(200)
+      // the wedged one stays registered (counted against the cap, retried by the next reap): never orphaned
+      expect(s.entries().map((e) => e.id)).toEqual(['cf-1', 'cf-2'])
+      expect(log).toHaveBeenCalledWith('destroy cf-1 did not finish; kept for the next reap')
+    } finally {
+      log.mockRestore()
+      vi.useRealTimers()
+    }
   })
   it('reaps expired sandboxes before enforcing the cap on create', async () => {
     const s = setup()

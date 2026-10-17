@@ -1,6 +1,6 @@
 import { isDrain } from './alarm-guard.js'
 import { isAuthorized } from './auth.js'
-import { CREATE_TIMEOUT_MS, MAX_BODY_BYTES, MAX_EXEC_TIMEOUT_MS, PROVISIONING_REAP_MS } from './limits.js'
+import { CREATE_TIMEOUT_MS, DESTROY_TIMEOUT_MS, MAX_BODY_BYTES, MAX_EXEC_TIMEOUT_MS, PROVISIONING_REAP_MS } from './limits.js'
 import { clampLifetimeMin, type ReserveResult, type SandboxEntry } from './registry-core.js'
 
 export interface RegistryPort {
@@ -41,13 +41,29 @@ const info = (e: SandboxEntry) => ({
 export async function reap(deps: BridgeDeps, all = false): Promise<string[]> {
   const now = deps.now()
   const gone: string[] = []
-  for (const e of await deps.registry.list()) {
-    if (!all && e.expiresAt > now) continue
-    await deps.backend.destroy(e.id).catch(() => {})
+  const due = (await deps.registry.list()).filter((e) => all || e.expiresAt <= now)
+  // destroys run in parallel and bounded; releases stay sequential (the registry is read-modify-write)
+  const done = await Promise.all(due.map((e) => destroyBounded(deps, e.id)))
+  for (const [i, e] of due.entries()) {
+    if (!done[i]) {
+      console.error(`destroy ${e.id} did not finish; kept for the next reap`)
+      continue
+    }
     await deps.registry.release(e.id)
     gone.push(e.id)
   }
   return gone
+}
+
+/** True once the backend destroy settled (a failed destroy counts: the container is gone or unreachable). */
+async function destroyBounded(deps: BridgeDeps, id: string): Promise<boolean> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const timedOut = new Promise<false>((res) => (timer = setTimeout(() => res(false), DESTROY_TIMEOUT_MS)))
+  try {
+    return await Promise.race([deps.backend.destroy(id).then(() => true, () => true), timedOut])
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 /** Reads the body, aborting as soon as it exceeds the cap (Content-Length can be absent or wrong). */
