@@ -38,6 +38,12 @@ export class RegistryCore {
     return this.store.read()
   }
 
+  /** Move an entry's expiry (the reaper destroys it then); no-op for an unknown id. */
+  async expire(id: string, at: number): Promise<void> {
+    const entries = await this.store.read()
+    await this.store.write(entries.map((e) => (e.id === id ? { ...e, expiresAt: at } : e)))
+  }
+
   async release(id: string): Promise<void> {
     const entries = await this.store.read()
     await this.store.write(entries.filter((e) => e.id !== id))

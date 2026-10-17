@@ -21,6 +21,10 @@ export class SandboxRegistry extends DurableObject<DrainEnv> {
     return this.core.list()
   }
 
+  expire(id: string, at: number): Promise<void> {
+    return this.core.expire(id, at)
+  }
+
   release(id: string): Promise<void> {
     return this.core.release(id)
   }

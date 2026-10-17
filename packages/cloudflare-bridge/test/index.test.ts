@@ -30,6 +30,7 @@ function env(extra: Record<string, string> = {}) {
       return { ok: true, entry }
     },
     list: async () => entries,
+    expire: async (id: string, at: number) => void (entries = entries.map((e) => (e.id === id ? { ...e, expiresAt: at } : e))),
     release: async (id: string) => void (entries = entries.filter((e) => e.id !== id)),
   }
   return {
