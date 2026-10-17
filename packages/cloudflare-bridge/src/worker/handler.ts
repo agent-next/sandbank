@@ -62,7 +62,7 @@ async function destroyBounded(deps: BridgeDeps, id: string): Promise<boolean> {
   try {
     return await Promise.race([deps.backend.destroy(id).then(() => true, () => true), timedOut])
   } finally {
-    clearTimeout(timer)
+    if (timer !== undefined) clearTimeout(timer)
   }
 }
 

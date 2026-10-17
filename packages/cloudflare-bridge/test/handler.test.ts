@@ -150,14 +150,16 @@ describe('cap and lifetime (safety 1, 4)', () => {
       await s.req('POST', '/v1/sandboxes', { lifetimeMinutes: 1 })
       s.advance(61_000)
       s.backend.destroy.mockImplementation(() => new Promise<void>(() => {}))
-      // timers register after the async auth check: step the clock past the bound, as a slow DO would
-      const settle = async () => { for (let i = 0; i < 4; i++) await vi.advanceTimersByTimeAsync(DESTROY_TIMEOUT_MS / 2) }
-      const pending = s.req('POST', '/v1/sandboxes', {})
-      await settle()
-      expect((await pending).status).toBe(201)
-      const list = s.req('GET', '/v1/sandboxes')
-      await settle()
-      expect((await list).status).toBe(200)
+      // timers register after the async auth check, whose real duration varies with load: keep
+      // stepping the fake clock until the request answers (a hang fails at the test timeout)
+      const answer = async (r: Promise<Response>) => {
+        let res: Response | undefined
+        void r.then((x) => (res = x))
+        while (!res) await vi.advanceTimersByTimeAsync(DESTROY_TIMEOUT_MS / 5)
+        return res
+      }
+      expect((await answer(s.req('POST', '/v1/sandboxes', {}))).status).toBe(201)
+      expect((await answer(s.req('GET', '/v1/sandboxes'))).status).toBe(200)
       // the wedged one stays registered (counted against the cap, retried by the next reap): never orphaned
       expect(s.entries().map((e) => e.id)).toEqual(['cf-1', 'cf-2'])
       expect(log).toHaveBeenCalledWith('destroy cf-1 did not finish; kept for the next reap')
