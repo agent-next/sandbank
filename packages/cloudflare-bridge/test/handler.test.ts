@@ -1,7 +1,17 @@
 import { describe, expect, it, vi } from 'vitest'
 import { handle, reap, type Backend, type BridgeDeps } from '../src/worker/handler.js'
 import { RegistryCore, type SandboxEntry } from '../src/worker/registry-core.js'
-import { CREATE_TIMEOUT_MS, MAX_SANDBOXES, PROVISIONING_REAP_MS } from '../src/worker/limits.js'
+import { CREATE_TIMEOUT_MS, DESTROY_TIMEOUT_MS, MAX_SANDBOXES, PROVISIONING_REAP_MS } from '../src/worker/limits.js'
+
+/** Steps the fake clock until the request answers. The handler arms its timers after async work (auth,
+ * registry) whose real duration varies with machine load, so a fixed number of steps can finish
+ * before a timer exists and hang the test. A real hang still fails at the test timeout. */
+async function answer(r: Promise<Response>, stepMs: number): Promise<Response> {
+  let res: Response | undefined
+  void r.then((x) => (res = x))
+  while (!res) await vi.advanceTimersByTimeAsync(stepMs)
+  return res
+}
 
 function setup(env: BridgeDeps['env'] = { BRIDGE_TOKEN: 'secret' }) {
   let entries: SandboxEntry[] = []
@@ -83,10 +93,7 @@ describe('cap and lifetime (safety 1, 4)', () => {
       const s = setup()
       let start!: () => void
       s.backend.create.mockImplementationOnce(() => new Promise<void>((res) => (start = res)))
-      const pending = s.req('POST', '/v1/sandboxes', {})
-      // the handler awaits the registry before it arms the timer, so advance in steps
-      for (let i = 0; i < 4; i++) await vi.advanceTimersByTimeAsync(CREATE_TIMEOUT_MS / 2)
-      const r = await pending
+      const r = await answer(s.req('POST', '/v1/sandboxes', {}), CREATE_TIMEOUT_MS / 4)
       expect(r.status).toBe(503)
       expect(r.headers.get('retry-after')).toBe('30')
       expect(await r.json()).toMatchObject({ code: 'provisioning' })
@@ -109,9 +116,7 @@ describe('cap and lifetime (safety 1, 4)', () => {
       const s = setup()
       let fail!: (e: Error) => void
       s.backend.create.mockImplementationOnce(() => new Promise<void>((_, rej) => (fail = rej)))
-      const pending = s.req('POST', '/v1/sandboxes', {})
-      for (let i = 0; i < 4; i++) await vi.advanceTimersByTimeAsync(CREATE_TIMEOUT_MS / 2)
-      expect((await pending).status).toBe(503)
+      expect((await answer(s.req('POST', '/v1/sandboxes', {}), CREATE_TIMEOUT_MS / 4)).status).toBe(503)
       fail(new Error('start failed'))
       await vi.advanceTimersByTimeAsync(1)
       expect(log).toHaveBeenCalledWith('create cf-1 failed after the provisioning timeout', expect.any(Error))
@@ -139,6 +144,26 @@ describe('cap and lifetime (safety 1, 4)', () => {
     expect(s.backend.destroy).toHaveBeenCalledWith('cf-1')
     expect(s.backend.exec).not.toHaveBeenCalled()
     expect(s.entries()).toEqual([])
+  })
+  it('a destroy that never returns does not block create or list (reap is bounded)', async () => {
+    // 2026-10-17: one wedged sandbox DO made every create and list hang for minutes, because each
+    // request reaps inline and waited on that destroy
+    vi.useFakeTimers()
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      const s = setup()
+      await s.req('POST', '/v1/sandboxes', { lifetimeMinutes: 1 })
+      s.advance(61_000)
+      s.backend.destroy.mockImplementation(() => new Promise<void>(() => {}))
+      expect((await answer(s.req('POST', '/v1/sandboxes', {}), DESTROY_TIMEOUT_MS / 5)).status).toBe(201)
+      expect((await answer(s.req('GET', '/v1/sandboxes'), DESTROY_TIMEOUT_MS / 5)).status).toBe(200)
+      // the wedged one stays registered (counted against the cap, retried by the next reap): never orphaned
+      expect(s.entries().map((e) => e.id)).toEqual(['cf-1', 'cf-2'])
+      expect(log).toHaveBeenCalledWith('destroy cf-1 did not finish; kept for the next reap')
+    } finally {
+      log.mockRestore()
+      vi.useRealTimers()
+    }
   })
   it('reaps expired sandboxes before enforcing the cap on create', async () => {
     const s = setup()

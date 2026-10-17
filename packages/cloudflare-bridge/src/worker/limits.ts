@@ -16,3 +16,6 @@ export const CREATE_TIMEOUT_MS = 90_000
  * of up to ~5.5 min were seen), so a late container is never orphaned. */
 export const PROVISIONING_REAP_MS = 10 * 60_000
 export const MAX_BODY_BYTES = 8 * 1024 * 1024
+/** Every request reaps expired sandboxes inline; a destroy slower than this is left for the next reap
+ * (the entry stays registered), so one wedged sandbox cannot stall create and list. */
+export const DESTROY_TIMEOUT_MS = 5_000
