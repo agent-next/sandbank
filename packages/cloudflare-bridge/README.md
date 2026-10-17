@@ -11,11 +11,11 @@ Cloudflare has no hard spending limit, so the bridge is built to be cheap and ea
 
 | Guard | Value |
 | --- | --- |
-| Container `max_instances` | 3 |
-| Container `instance_type` | `basic` |
+| Container `max_instances` | 256 |
+| Container `instance_type` | `standard-1` (1/2 vCPU, 4 GiB: fits one Claude Code worker) |
 | Idle sleep (`sleepAfter`) | 5 min |
 | Sandbox lifetime | default 30 min, max 60 min, enforced per request and by a 5-minute cron |
-| Concurrent sandboxes | 3 (HTTP 429 at the cap) |
+| Concurrent sandboxes | 256 (HTTP 429 at the cap) |
 | Creation cutoff | optional `CREATE_DEADLINE` var (ISO time): creates return 403 from then on; unset means no cutoff, an unparseable value refuses creates |
 | Kill switch | `DRAIN=1`: every request gets 503, every alarm deletes itself and stops the container, the cron destroys all sandboxes |
 | Alarm hygiene | `schedule()` values are clamped to [0, 1 h] (the library takes seconds, not epoch ms); `alarm()` never throws, it parks |

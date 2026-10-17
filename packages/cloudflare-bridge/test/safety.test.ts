@@ -3,14 +3,14 @@ import { describe, expect, it, vi } from 'vitest'
 import { clampSchedule, guardedAlarm, isDrain } from '../src/worker/alarm-guard.js'
 import { safeEqual } from '../src/worker/auth.js'
 import { RegistryCore, type SandboxEntry } from '../src/worker/registry-core.js'
-import { MAX_ALARM_HORIZON_S, MAX_LIFETIME_MIN } from '../src/worker/limits.js'
+import { MAX_ALARM_HORIZON_S, MAX_LIFETIME_MIN, MAX_SANDBOXES } from '../src/worker/limits.js'
 
 const wrangler = JSON.parse(readFileSync(new URL('../wrangler.jsonc', import.meta.url), 'utf8'))
 
 describe('container config (safety 1)', () => {
   const c = wrangler.containers[0]
-  it('caps instances at 3', () => expect(c.max_instances).toBeLessThanOrEqual(3))
-  it('uses the smallest shell-capable instance type', () => expect(['lite', 'basic']).toContain(c.instance_type))
+  it('caps instances at MAX_SANDBOXES', () => expect(c.max_instances).toBeLessThanOrEqual(MAX_SANDBOXES))
+  it('uses the smallest instance type that fits a Claude Code worker', () => expect(c.instance_type).toBe('standard-1'))
   it('sleeps after <= 5 minutes', async () => {
     vi.doMock('@cloudflare/sandbox', () => ({
       Sandbox: class {
@@ -42,17 +42,17 @@ describe('lifetime and cap (safety 1, 4)', () => {
     expect(a.ok && a.entry.expiresAt).toBe(30 * 60_000)
     expect(b.ok && b.entry.expiresAt).toBe(MAX_LIFETIME_MIN * 60_000)
   })
-  it('refuses the 4th sandbox and frees a slot on release', async () => {
+  it('refuses the sandbox past the cap and frees a slot on release', async () => {
     const r = new RegistryCore(mem())
-    for (const id of ['a', 'b', 'c']) expect((await r.reserve(id, 5, 0)).ok).toBe(true)
-    expect(await r.reserve('d', 5, 0)).toEqual({ ok: false, reason: 'capacity', max: 3 })
-    await r.release('a')
-    expect((await r.reserve('d', 5, 0)).ok).toBe(true)
+    for (let i = 0; i < MAX_SANDBOXES; i++) expect((await r.reserve(`s${i}`, 5, 0)).ok).toBe(true)
+    expect(await r.reserve('x', 5, 0)).toEqual({ ok: false, reason: 'capacity', max: MAX_SANDBOXES })
+    await r.release('s0')
+    expect((await r.reserve('x', 5, 0)).ok).toBe(true)
   })
-  it('cannot be configured above 3', async () => {
-    const r = new RegistryCore(mem(), 50)
-    for (const id of ['a', 'b', 'c']) await r.reserve(id, 5, 0)
-    expect((await r.reserve('d', 5, 0)).ok).toBe(false)
+  it('cannot be configured above MAX_SANDBOXES', async () => {
+    const r = new RegistryCore(mem(), MAX_SANDBOXES + 50)
+    for (let i = 0; i < MAX_SANDBOXES; i++) await r.reserve(`s${i}`, 5, 0)
+    expect((await r.reserve('x', 5, 0)).ok).toBe(false)
   })
 })
 
