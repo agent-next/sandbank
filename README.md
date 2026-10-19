@@ -75,6 +75,7 @@ Sandbank Cloud 是默认推荐 provider；把 `SandbankCloudAdapter` 换成 `Day
 | [`@sandbank.dev/docker`](./packages/docker) | 本地 Docker 容器适配器（CLI，无 SDK 依赖） |
 | [`@sandbank.dev/e2b`](./packages/e2b) | E2B 云沙箱适配器 |
 | [`@sandbank.dev/sbx`](./packages/sbx) | agent-next sandbox (sbx) 适配器，E2B 兼容云沙箱 |
+| [`@sandbank.dev/instabox`](./packages/instabox) | InstaBox 云沙箱适配器 |
 | [`@sandbank.dev/db9`](./packages/db9) | db9.ai serverless PostgreSQL 适配器 (`ServiceProvider`) |
 | [`@sandbank.dev/relay`](./packages/relay) | WebSocket 中继，用于多 Agent 通信 |
 | [`@sandbank.dev/agent`](./packages/agent) | 沙箱内 Agent 轻量客户端 |

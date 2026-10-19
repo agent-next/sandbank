@@ -75,6 +75,7 @@ Sandbank Cloud は推奨デフォルト provider です。`SandbankCloudAdapter`
 | [`@sandbank.dev/docker`](./packages/docker) | ローカル Docker コンテナアダプター (CLI、SDK 依存なし) |
 | [`@sandbank.dev/e2b`](./packages/e2b) | E2B クラウドサンドボックスアダプター |
 | [`@sandbank.dev/sbx`](./packages/sbx) | agent-next sandbox (sbx) アダプター、E2B 互換クラウドサンドボックス |
+| [`@sandbank.dev/instabox`](./packages/instabox) | InstaBox クラウドサンドボックスアダプター |
 | [`@sandbank.dev/db9`](./packages/db9) | db9.ai serverless PostgreSQL アダプター (`ServiceProvider`) |
 | [`@sandbank.dev/relay`](./packages/relay) | マルチエージェント通信用 WebSocket リレー |
 | [`@sandbank.dev/agent`](./packages/agent) | サンドボックス内エージェント軽量クライアント |
