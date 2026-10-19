@@ -613,9 +613,6 @@ describe('InstaBoxAdapter', () => {
     })
 
     it('readFile should chunk reads for files > 1 MiB and concatenate', async () => {
-    })
-
-    it('readFile should chunk reads for files > 1 MiB and concatenate', async () => {
       // Simulate a 1,200,000-byte file: 3 chunks (512K + 512K + ~135K raw)
       const chunk1 = new Uint8Array(524288).fill(65)
       const chunk2 = new Uint8Array(524288).fill(66)
