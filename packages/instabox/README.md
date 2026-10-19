@@ -51,8 +51,9 @@ API reference: https://instabox.sh/docs/api
 
 - **sleep / wake** map to InstaBox `suspend` / `resume` (both wait for the operation to finish).
 - **exposePort** publishes the port and returns its public URL.
-- **createSnapshot** polls `GET /v1/snapshots/{id}` until the upload is `ready`. InstaBox has no
-  in-place restore — pass `image: 'sn_...'` to `create()` to start a new sandbox from a snapshot.
+- Snapshots: InstaBox has no in-place restore, so sandboxes expose no snapshot interface. Save one with
+  the client (`createInstaBoxRestClient().createSnapshot`) or the dashboard, then pass `image: 'sn_...'`
+  to `create()` to start a new sandbox from it.
 - Not supported: `exec.stream`, `terminal`, `volumes`, `services`, `snapshot` (restore).
 
 ## Characteristics and limits

@@ -567,6 +567,21 @@ describe('InstaBoxAdapter', () => {
       await expect(sandbox.writeFile!('/root/x', 'y')).rejects.toThrow('permission denied')
     })
 
+    it('readFile fallback should fail the pipeline when dd fails', async () => {
+      ;(mockClient.readFile as ReturnType<typeof vi.fn>).mockResolvedValue({
+        path: '/f.bin', type: 'file', size: 3, mode: '-rw-------', modTime: '2026-01-01T00:00:00Z', binary: true,
+      })
+      ;(mockClient.exec as ReturnType<typeof vi.fn>).mockResolvedValue({
+        stdout: '', stderr: 'dd: Permission denied', exitCode: 1, timedOut: false, truncated: false,
+      })
+
+      const adapter = createAdapter({ asRoot: false })
+      const sandbox = await adapter.createSandbox({})
+      await expect(sandbox.readFile!('/f.bin')).rejects.toThrow('Permission denied')
+      const cmd = (mockClient.exec as ReturnType<typeof vi.fn>).mock.calls[0][1].cmd
+      expect(cmd.startsWith('set -o pipefail; dd ')).toBe(true)
+    })
+
     it('readFile should use the files endpoint for text files', async () => {
       ;(mockClient.readFile as ReturnType<typeof vi.fn>).mockResolvedValue({
         path: '/f.txt', type: 'file', size: 5, mode: '-rw-r--r--', modTime: '2026-01-01T00:00:00Z', content: 'hello',
@@ -687,51 +702,11 @@ describe('InstaBoxAdapter', () => {
       expect(mockClient.publishPort).toHaveBeenCalledWith('sb-123', 3000)
     })
 
-    it('createSnapshot should return the snapshot id when already ready', async () => {
+    it('should not offer a snapshot interface (InstaBox has no in-place restore)', async () => {
       const adapter = createAdapter()
       const sandbox = await adapter.createSandbox({})
-      const result = await sandbox.createSnapshot!('my-snap')
-
-      expect(result.snapshotId).toBe('sn_new')
-      expect(mockClient.createSnapshot).toHaveBeenCalledWith('sb-123', 'my-snap')
-    })
-
-    it('createSnapshot should generate a name when none is given', async () => {
-      const adapter = createAdapter()
-      const sandbox = await adapter.createSandbox({})
-      await sandbox.createSnapshot!()
-
-      expect(mockClient.createSnapshot).toHaveBeenCalledWith('sb-123', expect.stringMatching(/^snap-[0-9a-f]{8}$/))
-    })
-
-    it('createSnapshot should poll until ready', async () => {
-      vi.useFakeTimers()
-      ;(mockClient.createSnapshot as ReturnType<typeof vi.fn>).mockResolvedValue({
-        id: 'sn_new', name: 'snap-1', status: 'pending', createdAt: '2026-01-01T00:00:00Z',
-      })
-      ;(mockClient.getSnapshot as ReturnType<typeof vi.fn>).mockResolvedValue({
-        id: 'sn_new', name: 'snap-1', status: 'ready', createdAt: '2026-01-01T00:00:00Z',
-      })
-
-      const adapter = createAdapter()
-      const sandbox = await adapter.createSandbox({})
-      const promise = sandbox.createSnapshot!('snap-1')
-      await vi.advanceTimersByTimeAsync(2000)
-      const result = await promise
-
-      expect(result.snapshotId).toBe('sn_new')
-      expect(mockClient.getSnapshot).toHaveBeenCalledTimes(1)
-      vi.useRealTimers()
-    })
-
-    it('createSnapshot should throw ProviderError when it fails', async () => {
-      ;(mockClient.createSnapshot as ReturnType<typeof vi.fn>).mockResolvedValue({
-        id: 'sn_new', name: 'snap-1', status: 'failed', error: 'disk full', createdAt: '2026-01-01T00:00:00Z',
-      })
-
-      const adapter = createAdapter()
-      const sandbox = await adapter.createSandbox({})
-      await expect(sandbox.createSnapshot!('snap-1')).rejects.toThrow(ProviderError)
+      expect('createSnapshot' in sandbox).toBe(false)
+      expect('restoreSnapshot' in sandbox).toBe(false)
     })
   })
 

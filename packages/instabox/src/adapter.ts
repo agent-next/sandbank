@@ -32,9 +32,6 @@ const MAX_EXEC_TIMEOUT_SECONDS = 600
 const OP_POLL_SECONDS = 25
 const OP_MAX_ATTEMPTS = 60
 
-// Snapshots have no long-poll endpoint; poll GET /v1/snapshots/{id}.
-const SNAPSHOT_POLL_MS = 2000
-const SNAPSHOT_MAX_ATTEMPTS = 150
 
 // Chunk size for chunked base64 reads (raw bytes per exec; base64 ~1.33x < 1 MiB stdout cap).
 const READ_CHUNK_BYTES = 524288
@@ -78,9 +75,6 @@ function generateName(): string {
 }
 
 /** Snapshot name: 1-63 of a-z, 0-9, '-', starting with a letter or digit. */
-function generateSnapshotName(): string {
-  return `snap-${crypto.randomUUID().slice(0, 8)}`
-}
 
 function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`
@@ -188,7 +182,7 @@ function wrapSandbox(
       const chunks: Uint8Array[] = []
       let skip = 0
       for (;;) {
-        const cmd = `dd if=${shellQuote(path)} bs=${READ_CHUNK_BYTES} skip=${skip} count=1 status=none | base64 -w0`
+        const cmd = `set -o pipefail; dd if=${shellQuote(path)} bs=${READ_CHUNK_BYTES} skip=${skip} count=1 status=none | base64 -w0`
         const execCmd = asRoot ? `sudo -n -E bash -lc ${shellQuote(cmd)}` : cmd
         const result = await client.exec(data.id, { cmd: execCmd, envs: env })
         if (result.exitCode !== 0) {
@@ -221,23 +215,6 @@ function wrapSandbox(
     async exposePort(port: number): Promise<{ url: string }> {
       const pub = await client.publishPort(data.id, port)
       return { url: pub.url }
-    },
-
-    async createSnapshot(name?: string): Promise<{ snapshotId: string }> {
-      let current = await client.createSnapshot(data.id, name ?? generateSnapshotName())
-      for (let i = 0; i < SNAPSHOT_MAX_ATTEMPTS; i++) {
-        if (current.status === 'ready') return { snapshotId: current.id }
-        if (current.status === 'failed') {
-          throw new ProviderError(
-            'instabox',
-            new Error(`Snapshot '${current.name}' failed: ${current.error ?? 'unknown error'}`),
-            data.id,
-          )
-        }
-        await new Promise((r) => setTimeout(r, SNAPSHOT_POLL_MS))
-        current = await client.getSnapshot(current.id)
-      }
-      throw new ProviderError('instabox', new Error(`Timed out waiting for snapshot ${current.id}`), data.id)
     },
   }
 }
