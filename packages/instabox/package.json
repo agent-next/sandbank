@@ -1,0 +1,37 @@
+{
+  "name": "@sandbank.dev/instabox",
+  "version": "0.0.1",
+  "description": "InstaBox (instabox.sh) cloud sandbox adapter for Sandbank",
+  "license": "MIT",
+  "type": "module",
+  "homepage": "https://sandbank.dev",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/chekusu/sandbank.git",
+    "directory": "packages/instabox"
+  },
+  "keywords": ["sandbox", "ai-agent", "instabox", "cloud"],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@sandbank.dev/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.0",
+    "typescript": "^5.7.3",
+    "vitest": "^4.0.18"
+  }
+}
