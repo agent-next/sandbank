@@ -38,6 +38,8 @@ const SNAPSHOT_MAX_ATTEMPTS = 150
 
 // Chunk size for chunked base64 reads (raw bytes per exec; base64 ~1.33x < 1 MiB stdout cap).
 const READ_CHUNK_BYTES = 524288
+// Chunk size for chunked base64 writes (raw bytes per exec; base64 ~1.33x < 1 MiB stdin cap).
+const WRITE_CHUNK_BYTES = 524288
 
 /** Label set on every machine we create, so integration runs can assert cleanup. */
 const METADATA_LABEL = { source: 'sandbank' }
@@ -157,18 +159,24 @@ function wrapSandbox(
     // No write endpoint: stream the base64'd content through exec stdin.
     async writeFile(path: string, content: string | Uint8Array): Promise<void> {
       const bytes = typeof content === 'string' ? new TextEncoder().encode(content) : content
-      const mkdirCmd = `mkdir -p $(dirname ${shellQuote(path)}) && base64 -d > ${shellQuote(path)}`
-      // Quote the substitution output too: mkdir -p "$(dirname '<path>')"
-      const safeMkdir = `mkdir -p "$(dirname ${shellQuote(path)})" && base64 -d > ${shellQuote(path)}`
-      const result = await client.exec(data.id, {
-        cmd: asRoot ? `sudo -n -E bash -lc ${shellQuote(safeMkdir)}` : safeMkdir,
-        stdin: toBase64(bytes),
-        envs: env,
-      })
-      if (result.exitCode !== 0) {
-        throw new Error(`writeFile failed for '${path}': ${result.stderr || `exit ${result.exitCode}`}`)
-      }
-      void mkdirCmd
+      // exec stdin caps at 1 MiB: send base64 chunks, the first truncates, the rest append.
+      let off = 0
+      do {
+        const chunk = bytes.subarray(off, off + WRITE_CHUNK_BYTES)
+        // Quote the substitution output too: mkdir -p "$(dirname '<path>')"
+        const cmd = off === 0
+          ? `mkdir -p "$(dirname ${shellQuote(path)})" && base64 -d > ${shellQuote(path)}`
+          : `base64 -d >> ${shellQuote(path)}`
+        const result = await client.exec(data.id, {
+          cmd: asRoot ? `sudo -n -E bash -lc ${shellQuote(cmd)}` : cmd,
+          stdin: toBase64(chunk),
+          envs: env,
+        })
+        if (result.exitCode !== 0) {
+          throw new Error(`writeFile failed for '${path}': ${result.stderr || `exit ${result.exitCode}`}`)
+        }
+        off += WRITE_CHUNK_BYTES
+      } while (off < bytes.length)
     },
 
     async readFile(path: string): Promise<Uint8Array> {

@@ -521,6 +521,22 @@ describe('InstaBoxAdapter', () => {
       expect(call[1].stdin).toBe(btoa(String.fromCharCode(...new TextEncoder().encode('hi ☃'))))
     })
 
+    it('writeFile should split content over 1 MiB into appending chunks under the stdin cap', async () => {
+      const adapter = createAdapter()
+      const sandbox = await adapter.createSandbox({})
+      const data = new Uint8Array(1_200_000).map((_, i) => i % 251)
+      await sandbox.writeFile!('/tmp/big.bin', data)
+
+      const calls = (mockClient.exec as ReturnType<typeof vi.fn>).mock.calls
+      expect(calls).toHaveLength(3)
+      expect(calls[0][1].cmd).toContain('base64 -d >')
+      expect(calls[1][1].cmd).toContain('base64 -d >>')
+      expect(calls[2][1].cmd).toContain('base64 -d >>')
+      for (const c of calls) expect(c[1].stdin.length).toBeLessThan(1_048_576)
+      const joined = calls.flatMap(c => [...Uint8Array.from(atob(c[1].stdin), ch => ch.charCodeAt(0))])
+      expect(joined).toEqual([...data])
+    })
+
     it('writeFile should quote the dirname substitution for paths with spaces', async () => {
       const adapter = createAdapter()
       const sandbox = await adapter.createSandbox({})

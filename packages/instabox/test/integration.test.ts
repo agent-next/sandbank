@@ -38,6 +38,10 @@ describe.skipIf(skip)('InstaBoxAdapter integration', () => {
     await sandbox.writeFile('/tmp/sandbank-test.txt', content)
     const readBack = await sandbox.readFile('/tmp/sandbank-test.txt')
     expect(new TextDecoder().decode(readBack)).toBe(content)
+    // binary over the 1 MiB exec stdin/stdout caps, path with a space
+    const big = new Uint8Array(2_500_000).map((_, i) => (i * 31) % 256)
+    await sandbox.writeFile('/tmp/sandbank dir/big.bin', big)
+    expect(Buffer.from(await sandbox.readFile('/tmp/sandbank dir/big.bin')).equals(Buffer.from(big))).toBe(true)
     console.log('  file round trip ok')
 
     // --- exposePort ---
