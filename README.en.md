@@ -75,6 +75,7 @@ Sandbank Cloud is the recommended default provider. Swap `SandbankCloudAdapter` 
 | [`@sandbank.dev/docker`](./packages/docker) | Local Docker container adapter (CLI, no SDK) |
 | [`@sandbank.dev/e2b`](./packages/e2b) | E2B cloud sandbox adapter |
 | [`@sandbank.dev/sbx`](./packages/sbx) | agent-next sandbox (sbx) adapter, E2B-compatible cloud sandbox |
+| [`@sandbank.dev/instabox`](./packages/instabox) | InstaBox cloud sandbox adapter |
 | [`@sandbank.dev/db9`](./packages/db9) | db9.ai serverless PostgreSQL adapter (ServiceProvider) |
 | [`@sandbank.dev/relay`](./packages/relay) | WebSocket relay for multi-agent communication |
 | [`@sandbank.dev/agent`](./packages/agent) | Lightweight client for agents running inside sandboxes |
