@@ -15,7 +15,6 @@ pnpm add @sandbank.dev/core @sandbank.dev/instabox
 | `apiKey` | `INSTABOX_API_KEY` | — | InstaBox API key (required) |
 | `apiUrl` | `INSTABOX_API_URL` | `https://api.instabox.sh` | API base URL |
 | `template` | — | `universal` | Template id used when `CreateConfig.image` is not set |
-| `asRoot` | — | `true` | When true (default), exec/writeFile/readFile run as root via `sudo -n -E`; set false to run as the guest user |
 
 ## Usage
 
@@ -64,9 +63,9 @@ API reference: https://instabox.sh/docs/api
 - **Lifetime:** `autoDestroyMinutes` (when > 0) maps to `timeoutSeconds`, clamped to 60 s – 4 h
   (the server clamps anything beyond 4 h silently); timeout action is `kill`. Omitted or `0`
   sends no timeout — the machine is not auto-destroyed.
-- **Execution identity:** by default every exec/writeFile/readFile runs as root via
-  `sudo -n -E bash -lc '<command>'` (cwd and env are preserved); `asRoot: false` runs as the
-  guest user unchanged.
+- **Execution identity:** every exec/writeFile/readFile runs as root via
+  `sudo -n -E bash -lc '<command>'` (cwd and env are preserved), like the other providers; the
+  guest user has passwordless sudo and the files endpoint reads as root.
 - **Idle auto-pause:** sandboxes pause after 30 idle minutes (fixed on non-manual-lifecycle accounts);
   `wake()` / the next call resumes them.
 - **Lifecycle ops** (`create`/`destroy`/`start`/`stop`/`suspend`/`resume`) are asynchronous: the adapter

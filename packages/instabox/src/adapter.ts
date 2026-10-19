@@ -121,14 +121,10 @@ function wrapSandbox(
   client: InstaBoxClient,
   data: InstaBoxMachine,
   env: Record<string, string> | undefined,
-  asRoot: boolean,
 ): AdapterSandbox {
-  // Root-wrapped command shape (default): sudo -n -E bash -lc <quoted cmd>.
-  // Non-root mode runs the command unchanged as the guest user.
-  const wrapCmd = (command: string): string => {
-    if (!asRoot) return command
-    return `sudo -n -E bash -lc ${shellQuote(command)}`
-  }
+  // Commands run as root, like the other providers (the guest user has passwordless sudo):
+  // sudo -n -E bash -lc <quoted cmd>. The files endpoint reads as root too.
+  const wrapCmd = (command: string): string => `sudo -n -E bash -lc ${shellQuote(command)}`
 
   return {
     get id() { return data.id },
@@ -162,7 +158,7 @@ function wrapSandbox(
           ? `mkdir -p "$(dirname ${shellQuote(path)})" && base64 -d > ${shellQuote(path)}`
           : `base64 -d >> ${shellQuote(path)}`
         const result = await client.exec(data.id, {
-          cmd: asRoot ? `sudo -n -E bash -lc ${shellQuote(cmd)}` : cmd,
+          cmd: wrapCmd(cmd),
           stdin: toBase64(chunk),
           envs: env,
         })
@@ -183,8 +179,7 @@ function wrapSandbox(
       let skip = 0
       for (;;) {
         const cmd = `set -o pipefail; dd if=${shellQuote(path)} bs=${READ_CHUNK_BYTES} skip=${skip} count=1 status=none | base64 -w0`
-        const execCmd = asRoot ? `sudo -n -E bash -lc ${shellQuote(cmd)}` : cmd
-        const result = await client.exec(data.id, { cmd: execCmd, envs: env })
+        const result = await client.exec(data.id, { cmd: wrapCmd(cmd), envs: env })
         if (result.exitCode !== 0) {
           throw new Error(`readFile failed for '${path}': ${result.stderr || `exit ${result.exitCode}`}`)
         }
@@ -250,10 +245,6 @@ export class InstaBoxAdapter implements SandboxAdapter {
     return this.clientPromise
   }
 
-  private asRoot(): boolean {
-    return this.config.asRoot !== false
-  }
-
   async createSandbox(config: CreateConfig): Promise<AdapterSandbox> {
     const client = await this.getClient()
     try {
@@ -280,7 +271,7 @@ export class InstaBoxAdapter implements SandboxAdapter {
       const op = await client.createMachine(body)
       const done = await waitForOperation(client, op)
       const machine = done.machine ?? await client.getMachine(op.machineId)
-      const sandbox = wrapSandbox(client, machine, config.env, this.asRoot())
+      const sandbox = wrapSandbox(client, machine, config.env)
       if (config.env) this.envBySandbox.set(machine.id, config.env)
       return sandbox
     } catch (err) {
@@ -294,7 +285,7 @@ export class InstaBoxAdapter implements SandboxAdapter {
     try {
       const machine = await client.getMachine(id)
       const env = this.envBySandbox.get(id)
-      return wrapSandbox(client, machine, env, this.asRoot())
+      return wrapSandbox(client, machine, env)
     } catch (err) {
       if (err instanceof InstaBoxApiError && err.status === 404) {
         throw new SandboxNotFoundError('instabox', id)

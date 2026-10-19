@@ -10,8 +10,6 @@ export interface InstaBoxAdapterConfig {
   /** Template id used when CreateConfig.image is not set. Default: 'universal'. */
   template?: string
 
-  /** Run exec/writeFile/readFile as root via `sudo -n -E` (default true). Set false to run as the guest user. */
-  asRoot?: boolean
 }
 
 // --- Client configuration (resolved, passed to the REST client) ---

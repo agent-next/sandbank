@@ -90,8 +90,8 @@ vi.mock('../src/rest-client.js', () => ({
 
 import { InstaBoxAdapter } from '../src/adapter.js'
 
-function createAdapter(config?: { asRoot?: boolean }) {
-  return new InstaBoxAdapter({ apiKey: 'test-key', apiUrl: 'https://api.test.com', ...config })
+function createAdapter() {
+  return new InstaBoxAdapter({ apiKey: 'test-key', apiUrl: 'https://api.test.com' })
 }
 
 describe('InstaBoxAdapter', () => {
@@ -471,14 +471,6 @@ describe('InstaBoxAdapter', () => {
       )
     })
 
-    it('exec should run unchanged as guest user when asRoot is false', async () => {
-      const adapter = createAdapter({ asRoot: false })
-      const sandbox = await adapter.createSandbox({})
-      await sandbox.exec('whoami')
-
-      expect((mockClient.exec as ReturnType<typeof vi.fn>).mock.calls[0][1].cmd).toBe('whoami')
-    })
-
     it('exec should default to 60s and clamp to the 600s API max', async () => {
       const adapter = createAdapter()
       const sandbox = await adapter.createSandbox({})
@@ -547,16 +539,6 @@ describe('InstaBoxAdapter', () => {
       expect(cmd).toContain('/tmp/space dir/nested/file.txt')
     })
 
-    it('writeFile should run as guest user unchanged when asRoot is false', async () => {
-      const adapter = createAdapter({ asRoot: false })
-      const sandbox = await adapter.createSandbox({})
-      await sandbox.writeFile!('/tmp/x.txt', 'y')
-
-      const cmd = (mockClient.exec as ReturnType<typeof vi.fn>).mock.calls[0][1].cmd
-      expect(cmd).not.toContain('sudo')
-      expect(cmd).toContain(`mkdir -p "$(dirname '/tmp/x.txt')"` )
-    })
-
     it('writeFile should throw when the exec fails', async () => {
       ;(mockClient.exec as ReturnType<typeof vi.fn>).mockResolvedValue({
         stdout: '', stderr: 'permission denied', exitCode: 1, timedOut: false, truncated: false,
@@ -575,11 +557,11 @@ describe('InstaBoxAdapter', () => {
         stdout: '', stderr: 'dd: Permission denied', exitCode: 1, timedOut: false, truncated: false,
       })
 
-      const adapter = createAdapter({ asRoot: false })
+      const adapter = createAdapter()
       const sandbox = await adapter.createSandbox({})
       await expect(sandbox.readFile!('/f.bin')).rejects.toThrow('Permission denied')
       const cmd = (mockClient.exec as ReturnType<typeof vi.fn>).mock.calls[0][1].cmd
-      expect(cmd.startsWith('set -o pipefail; dd ')).toBe(true)
+      expect(cmd.startsWith("sudo -n -E bash -lc 'set -o pipefail; dd ")).toBe(true)
     })
 
     it('readFile should use the files endpoint for text files', async () => {
@@ -654,24 +636,6 @@ describe('InstaBoxAdapter', () => {
       const adapter = createAdapter()
       const sandbox = await adapter.createSandbox({})
       await expect(sandbox.readFile!('/big')).rejects.toThrow(ProviderError)
-    })
-
-    it('readFile should run as guest user unchanged when asRoot is false', async () => {
-      ;(mockClient.readFile as ReturnType<typeof vi.fn>).mockResolvedValue({
-        path: '/bin', type: 'file', size: 3, mode: '-rw-r--r--', modTime: '2026-01-01T00:00:00Z',
-        binary: true,
-      })
-      ;(mockClient.exec as ReturnType<typeof vi.fn>).mockResolvedValue({
-        stdout: btoa('abc'), stderr: '', exitCode: 0, timedOut: false, truncated: false,
-      })
-
-      const adapter = createAdapter({ asRoot: false })
-      const sandbox = await adapter.createSandbox({})
-      await sandbox.readFile!('/bin')
-
-      const cmd = (mockClient.exec as ReturnType<typeof vi.fn>).mock.calls[0][1].cmd
-      expect(cmd).not.toContain('sudo')
-      expect(cmd).toContain(`dd if='/bin' bs=524288 skip=0 count=1 status=none | base64 -w0`)
     })
 
     it('sleep should suspend and wait for the operation', async () => {
