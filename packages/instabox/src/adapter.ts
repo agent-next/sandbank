@@ -24,13 +24,6 @@ export type { InstaBoxAdapterConfig }
 const DEFAULT_API_URL = 'https://api.instabox.sh'
 const DEFAULT_TEMPLATE = 'universal'
 
-// InstaBox sandboxes are a fixed size (4 vCPU / 8 GiB); resources are ignored.
-// Lifetime maps to timeoutSeconds, clamped to the API's 60 s minimum and a 4 h cap
-// (the server silently clamps beyond 4 h anyway unless the account has manual lifecycle).
-const MIN_TIMEOUT_SECONDS = 60
-const MAX_TIMEOUT_SECONDS = 14400
-const DEFAULT_TIMEOUT_MINUTES = 60
-
 // exec runs through `bash -lc` with a 60 s default / 600 s max per the API.
 const DEFAULT_EXEC_TIMEOUT_SECONDS = 60
 const MAX_EXEC_TIMEOUT_SECONDS = 600
@@ -42,6 +35,9 @@ const OP_MAX_ATTEMPTS = 60
 // Snapshots have no long-poll endpoint; poll GET /v1/snapshots/{id}.
 const SNAPSHOT_POLL_MS = 2000
 const SNAPSHOT_MAX_ATTEMPTS = 150
+
+// Chunk size for chunked base64 reads (raw bytes per exec; base64 ~1.33x < 1 MiB stdout cap).
+const READ_CHUNK_BYTES = 524288
 
 /** Label set on every machine we create, so integration runs can assert cleanup. */
 const METADATA_LABEL = { source: 'sandbank' }
@@ -67,11 +63,6 @@ function mapState(state: string): SandboxState {
     default:
       return 'error'
   }
-}
-
-function toTimeoutSeconds(minutes?: number): number {
-  const seconds = (minutes ?? DEFAULT_TIMEOUT_MINUTES) * 60
-  return Math.min(MAX_TIMEOUT_SECONDS, Math.max(MIN_TIMEOUT_SECONDS, seconds))
 }
 
 function toExecTimeoutSeconds(ms?: number): number {
@@ -120,16 +111,38 @@ async function waitForOperation(client: InstaBoxClient, op: InstaBoxOperation): 
   throw new ProviderError('instabox', new Error(`Timed out waiting for operation ${op.id}`), op.machineId)
 }
 
+/** Wait for an operation to reach ANY terminal state (succeeded or failed). */
+async function waitForTerminalOperation(client: InstaBoxClient, op: InstaBoxOperation): Promise<InstaBoxOperation> {
+  for (let i = 0; i < OP_MAX_ATTEMPTS; i++) {
+    if (op.state === 'succeeded' || op.state === 'failed') return op
+    op = await client.getOperation(op.id, OP_POLL_SECONDS)
+  }
+  throw new ProviderError('instabox', new Error(`Timed out waiting for operation ${op.id}`), op.machineId)
+}
+
 /** Wrap machine data + client into an AdapterSandbox. `env` is replayed on every exec. */
-function wrapSandbox(client: InstaBoxClient, data: InstaBoxMachine, env?: Record<string, string>): AdapterSandbox {
+function wrapSandbox(
+  client: InstaBoxClient,
+  data: InstaBoxMachine,
+  env: Record<string, string> | undefined,
+  asRoot: boolean,
+): AdapterSandbox {
+  // Root-wrapped command shape (default): sudo -n -E bash -lc <quoted cmd>.
+  // Non-root mode runs the command unchanged as the guest user.
+  const wrapCmd = (command: string): string => {
+    if (!asRoot) return command
+    return `sudo -n -E bash -lc ${shellQuote(command)}`
+  }
+
   return {
     get id() { return data.id },
     get state() { return mapState(data.state) },
     get createdAt() { return data.createdAt },
 
     async exec(command: string, options?: ExecOptions): Promise<ExecResult> {
+      const cmd = wrapCmd(command)
       const result = await client.exec(data.id, {
-        cmd: command,
+        cmd,
         cwd: options?.cwd,
         envs: env,
         timeoutSeconds: toExecTimeoutSeconds(options?.timeout),
@@ -144,13 +157,18 @@ function wrapSandbox(client: InstaBoxClient, data: InstaBoxMachine, env?: Record
     // No write endpoint: stream the base64'd content through exec stdin.
     async writeFile(path: string, content: string | Uint8Array): Promise<void> {
       const bytes = typeof content === 'string' ? new TextEncoder().encode(content) : content
+      const mkdirCmd = `mkdir -p $(dirname ${shellQuote(path)}) && base64 -d > ${shellQuote(path)}`
+      // Quote the substitution output too: mkdir -p "$(dirname '<path>')"
+      const safeMkdir = `mkdir -p "$(dirname ${shellQuote(path)})" && base64 -d > ${shellQuote(path)}`
       const result = await client.exec(data.id, {
-        cmd: `mkdir -p $(dirname ${shellQuote(path)}) && base64 -d > ${shellQuote(path)}`,
+        cmd: asRoot ? `sudo -n -E bash -lc ${shellQuote(safeMkdir)}` : safeMkdir,
         stdin: toBase64(bytes),
+        envs: env,
       })
       if (result.exitCode !== 0) {
         throw new Error(`writeFile failed for '${path}': ${result.stderr || `exit ${result.exitCode}`}`)
       }
+      void mkdirCmd
     },
 
     async readFile(path: string): Promise<Uint8Array> {
@@ -158,12 +176,30 @@ function wrapSandbox(client: InstaBoxClient, data: InstaBoxMachine, env?: Record
       if (file.type === 'file' && !file.binary && !file.truncated && file.content != null) {
         return new TextEncoder().encode(file.content)
       }
-      // Binary or oversized file — fall back to base64 through exec (stdout caps at 1 MiB)
-      const result = await client.exec(data.id, { cmd: `base64 -w0 ${shellQuote(path)}` })
-      if (result.exitCode !== 0) {
-        throw new Error(`readFile failed for '${path}': ${result.stderr || `exit ${result.exitCode}`}`)
+      // Binary or oversized file — chunked base64 through exec (stdout caps at 1 MiB).
+      const chunks: Uint8Array[] = []
+      let skip = 0
+      for (;;) {
+        const cmd = `dd if=${shellQuote(path)} bs=${READ_CHUNK_BYTES} skip=${skip} count=1 status=none | base64 -w0`
+        const execCmd = asRoot ? `sudo -n -E bash -lc ${shellQuote(cmd)}` : cmd
+        const result = await client.exec(data.id, { cmd: execCmd, envs: env })
+        if (result.exitCode !== 0) {
+          throw new Error(`readFile failed for '${path}': ${result.stderr || `exit ${result.exitCode}`}`)
+        }
+        if (result.truncated) {
+          throw new ProviderError('instabox', new Error(`readFile truncated for '${path}'`), data.id)
+        }
+        const raw = fromBase64(result.stdout.replace(/\s/g, ''))
+        if (raw.length === 0) break
+        chunks.push(raw)
+        if (raw.length < READ_CHUNK_BYTES) break
+        skip += 1
       }
-      return fromBase64(result.stdout.replace(/\s/g, ''))
+      const total = chunks.reduce((n, c) => n + c.length, 0)
+      const out = new Uint8Array(total)
+      let off = 0
+      for (const c of chunks) { out.set(c, off); off += c.length }
+      return out
     },
 
     async sleep(): Promise<void> {
@@ -203,11 +239,11 @@ export class InstaBoxAdapter implements SandboxAdapter {
   readonly capabilities: ReadonlySet<Capability> = new Set<Capability>([
     'sleep',
     'port.expose',
-    'snapshot',
   ])
 
   private clientPromise: Promise<InstaBoxClient> | null = null
   private readonly config: InstaBoxAdapterConfig
+  private readonly envBySandbox = new Map<string, Record<string, string>>()
 
   constructor(config: InstaBoxAdapterConfig) {
     this.config = config
@@ -229,16 +265,26 @@ export class InstaBoxAdapter implements SandboxAdapter {
     return this.clientPromise
   }
 
+  private asRoot(): boolean {
+    return this.config.asRoot !== false
+  }
+
   async createSandbox(config: CreateConfig): Promise<AdapterSandbox> {
     const client = await this.getClient()
     try {
       const body: InstaBoxCreateMachineRequest = {
         name: generateName(),
-        timeoutSeconds: toTimeoutSeconds(config.autoDestroyMinutes),
-        onTimeout: 'kill',
         metadata: METADATA_LABEL,
         vault: false,
       }
+      // autoDestroyMinutes: 0 or omitted => no auto-destroy (omit timeoutSeconds/onTimeout).
+      if (config.autoDestroyMinutes && config.autoDestroyMinutes > 0) {
+        const seconds = config.autoDestroyMinutes * 60
+        const clamped = Math.min(14400, Math.max(60, seconds))
+        body.timeoutSeconds = clamped
+        body.onTimeout = 'kill'
+      }
+
       // image starting with sn_ names a snapshot; anything else names a template
       if (config.image?.startsWith('sn_')) {
         body.snapshotId = config.image
@@ -249,7 +295,9 @@ export class InstaBoxAdapter implements SandboxAdapter {
       const op = await client.createMachine(body)
       const done = await waitForOperation(client, op)
       const machine = done.machine ?? await client.getMachine(op.machineId)
-      return wrapSandbox(client, machine, config.env)
+      const sandbox = wrapSandbox(client, machine, config.env, this.asRoot())
+      if (config.env) this.envBySandbox.set(machine.id, config.env)
+      return sandbox
     } catch (err) {
       if (err instanceof ProviderError) throw err
       throw new ProviderError('instabox', err)
@@ -260,7 +308,8 @@ export class InstaBoxAdapter implements SandboxAdapter {
     const client = await this.getClient()
     try {
       const machine = await client.getMachine(id)
-      return wrapSandbox(client, machine)
+      const env = this.envBySandbox.get(id)
+      return wrapSandbox(client, machine, env, this.asRoot())
     } catch (err) {
       if (err instanceof InstaBoxApiError && err.status === 404) {
         throw new SandboxNotFoundError('instabox', id)
@@ -281,11 +330,19 @@ export class InstaBoxAdapter implements SandboxAdapter {
             id: machine.id,
             state: mapState(machine.state),
             createdAt: machine.createdAt,
-            image: machine.snapshot?.id ?? machine.name,
+            image: machine.snapshot?.id ?? machine.template?.id ?? machine.name,
           })
         }
         cursor = page.nextCursor ?? undefined
-      } while (cursor && (filter?.limit == null || infos.length < filter.limit))
+        // Apply state filter before counting toward limit
+        if (filter?.state) {
+          const states = Array.isArray(filter.state) ? filter.state : [filter.state]
+          const filtered = infos.filter((s) => states.includes(s.state))
+          if (filter.limit != null && filtered.length >= filter.limit) break
+        } else if (filter?.limit != null && infos.length >= filter.limit) {
+          break
+        }
+      } while (cursor)
 
       let result = infos
       if (filter?.state) {
@@ -306,9 +363,9 @@ export class InstaBoxAdapter implements SandboxAdapter {
       // Idempotent: already destroyed
       if (err instanceof InstaBoxApiError && err.status === 404) return
 
-      // 409: another operation is in flight — wait for it, then retry once
+      // 409: another operation is in flight — wait for it to reach ANY terminal state, then retry once
       if (err instanceof InstaBoxApiError && err.status === 409 && err.operationId) {
-        await waitForOperation(client, await client.getOperation(err.operationId, OP_POLL_SECONDS))
+        await waitForTerminalOperation(client, await client.getOperation(err.operationId, OP_POLL_SECONDS))
         try {
           await waitForOperation(client, await client.deleteMachine(id))
           return

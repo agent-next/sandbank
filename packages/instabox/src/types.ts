@@ -9,6 +9,9 @@ export interface InstaBoxAdapterConfig {
 
   /** Template id used when CreateConfig.image is not set. Default: 'universal'. */
   template?: string
+
+  /** Run exec/writeFile/readFile as root via `sudo -n -E` (default true). Set false to run as the guest user. */
+  asRoot?: boolean
 }
 
 // --- Client configuration (resolved, passed to the REST client) ---
@@ -42,6 +45,8 @@ export interface InstaBoxMachine {
   operationId?: string | null
   /** The sandbox's source snapshot (also carries template images). */
   snapshot?: { id: string }
+  /** The template used to create the machine (when not created from a snapshot). */
+  template?: { id: string }
   metadata?: Record<string, string>
 }
 
